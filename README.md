@@ -2,25 +2,51 @@
 
 자연어로 입력한 기능을 DotPad(60×40 이진 촉각 디스플레이)에서 작동 가능한 범위 안에서 즉시 구현해주는 현장 프로토타이핑 도구.
 
-해외 영업 현장에서 고객이 원하는 기능을 말로 입력하면, 별도의 사용자 테스트 사이클 없이 그 자리에서 DotPad용 기능을 생성·시연하기 위한 컨셉입니다.
+라이브: https://baekjunjoo.github.io/superdot
 
 ## 구성
 
-- **Feature Builder** — 자연어 요청을 DotPad 런타임 코드(JS)로 변환. 출력은 항상 60×40 이진 디스플레이가 표현 가능한 범위로 제한됩니다.
-- **DotPad Simulator** — 60×40 핀 매트릭스 시뮬레이터. F1–F4 + 좌/우 팬 키 입력(화면 버튼 또는 키보드 1–4, ←→).
-- **TTS · Event Console** — 음성 안내와 키 이벤트 로그.
-- **Feature Library** — 생성한 기능 저장/재실행, JSON 내보내기.
+- **Feature Builder** — 자연어 요청을 DotPad 런타임 코드(JS)로 변환. 출력은 항상 60×40 이진 디스플레이가 표현 가능한 범위로 제한.
+- **DotPad Simulator** — 60×40 핀 매트릭스. F1–F4 + 좌/우 팬 키(화면 버튼 또는 키보드 1–4, ←→).
+- **BLE Driver** — Web Bluetooth로 실기기 DotPad에 같은 프레임을 실시간 전송 (Chrome/Edge, HTTPS).
+- **TTS · Event Console** — 음성 안내, 키 이벤트, BLE 진단 로그.
+- **Feature Library** — 생성 기능 저장/재실행. localStorage에 영구 저장, JSON 내보내기.
 
-## 실행
+## 설정 (상단 SETUP 버튼)
 
-정적 사이트입니다. `index.html`을 브라우저에서 열면 바로 동작합니다.
+| 항목 | 설명 |
+|---|---|
+| Generation API Endpoint | Cloudflare Worker 프록시 URL. 비우면 직접 호출(아티팩트 환경 전용) |
+| BLE Service UUID | DotPad GATT 서비스 UUID |
+| BLE Characteristic UUID | 쓰기 특성 UUID. 비우면 연결 시 쓰기 가능한 특성 자동 선택 |
+| Frame Encoding | `cells`(2×4 점자셀당 1바이트, dot1–8=bit0–7) 또는 `rows`(행 우선 비트팩) — 둘 다 300B |
+| Write Mode / Chunk | withResponse 여부 + 청크 크기(20B/180B) |
 
-자연어 기능 생성(Feature Builder)은 Anthropic API 호출이 필요하며, claude.ai 아티팩트 환경에서 동작하도록 작성되었습니다. GitHub Pages 등 일반 정적 호스팅에서는 시뮬레이터·데모·키 입력·TTS·라이브러리는 그대로 동작하고, 실시간 생성 부분은 별도 백엔드(또는 API 프록시) 연결이 필요합니다.
+## 생성 API 프록시 (필수 — 배포 환경)
 
-## 알려진 한계
+GitHub Pages에서는 Anthropic API를 직접 호출할 수 없습니다(키 노출·CORS). 동봉된 `worker.js`를 Cloudflare Workers에 배포하세요:
 
-- 실기기 BLE 연동은 미포함입니다(브라우저 샌드박스 제약). 배포 후 Web Bluetooth 출력 드라이버를 프레임버퍼 단계에 연결하면 됩니다.
-- Doto 디스플레이 폰트는 라틴 글자만 지원합니다(한글은 폴백 처리).
+1. dash.cloudflare.com → Workers & Pages → Create Worker → `worker.js` 내용 붙여넣고 Deploy
+2. Worker Settings → Variables → **Secrets**: `ANTHROPIC_API_KEY` 추가, (선택) `ALLOWED_ORIGIN=https://baekjunjoo.github.io`
+3. Worker URL을 사이트 SETUP → Generation API Endpoint에 입력
+
+## 실기기 BLE 연동 (공식 DotPadSDK)
+
+저장소 루트에 `DotPadSDK-3.0.0.js`를 두면(이 저장소에 포함됨) BLE CONNECT 시 공식 SDK로 연결됩니다:
+
+1. 상단 **BLE CONNECT** → 기기 선택 (SDK가 `DOTPAD` 이름으로 필터 스캔)
+2. 연결되면 배지가 `LIVE · DOTPAD`로 바뀌고, 시뮬레이터에 그려지는 모든 프레임이 기기로 동시 전송됨
+3. **실기기 하드웨어 키가 기능을 직접 조작** — F1–F4, 팬 좌/우가 SDK 키 콜백으로 들어와 현재 로드된 기능의 `dp.onKey`로 전달됨 (콘솔에 `[KEY·HW]`로 표시)
+
+전송 파이프라인: 프레임버퍼 → 2×4 점자셀 인코딩(300B, dot1–8=bit0–7) → hex 600자 → `displayGraphicData()` (라인 분할·전송·ACK는 SDK가 처리). 동일 프레임 중복 전송 자동 생략, 전송 간 최소 200ms 스로틀.
+
+SDK 파일이 없는 환경에서는 raw GATT 폴백으로 동작하며, 이때만 SETUP의 UUID/인코딩/쓰기 설정이 사용됩니다.
+
+## 파일
+
+- `index.html` — 앱 전체 (단일 파일, 빌드 불필요)
+- `worker.js` — Anthropic API 프록시 (Cloudflare Workers)
+- `DotPadSDK-3.0.0.js` — DotPad 공식 SDK (BLE 연결·전송·키 입력)
 
 ---
 
