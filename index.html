@@ -219,7 +219,7 @@
     </div>
     <div class="col-right">
       <div class="block" id="simulator">
-        <div class="block-head"><span>DOT PAD SIMULATOR &mdash; 60 &times; 40</span></div>
+        <div class="block-head"><span>DOT PAD SIMULATOR &mdash; 60 &times; 40</span><button class="btn" id="syncBtn" style="padding:5px 12px;font-size:10px" title="시뮬레이터-실기기 정렬 검증 패턴">SYNC TEST</button></div>
         <div class="deviceWrap">
           <div class="device">
             <div class="deviceHead"><span class="lbl">DOT PAD</span><span id="featureName">&mdash;</span></div>
@@ -273,8 +273,9 @@
         <div class="field">
           <label>Frame Encoding</label>
           <select id="cfgEnc">
-            <option value="cells">Braille cells — 2&times;4 셀당 1바이트 (300B)</option>
-            <option value="rows">Row bits — 행 우선 비트팩 (300B)</option>
+            <option value="cells">Graphic cells — 열 순차 bit0–7 (DotPad 표준)</option>
+            <option value="braille">Braille dots — 점자 도트 1–8 순 (비교용)</option>
+            <option value="rows">Row bits — 행 우선 비트팩 (raw 전용)</option>
           </select>
         </div>
         <div class="field">
@@ -578,14 +579,17 @@ var BLE={
   MIN_INTERVAL:200,                           // ms between frame pushes
 
   /* ---------- shared: frame encoding ---------- */
-  /* 60x40 -> 300 bytes. 'cells': 2x4 braille cell per byte (dot1..8 = bit0..7) — DotPad 표준.
-     'rows'(raw 폴백 전용 옵션): row-major bit packing. */
+  /* 60x40 -> 300 bytes (30x10 cells, row-major).
+     'cells'  : DotPad 그래픽 표준 — 셀 내 좌열 위→아래 bit0–3, 우열 위→아래 bit4–7
+                (bit = y%4 + (x%2)*4)
+     'braille': 점자 도트 1–8 순서(1,2,3,7 / 4,5,6,8) — 검증/비교용
+     'rows'   : row-major bit packing — raw 폴백 전용 */
   encodeFrame:function(buf){
     var out=new Uint8Array(300);
-    var mode=(BLE.mode==='sdk')?'cells':(SD.cfg.enc||'cells');
+    var mode=SD.cfg.enc||'cells';
     if(mode==='rows'){
       for(var i=0;i<2400;i++){ if(buf[i]) out[i>>3]|=(0x80>>(i&7)); }
-    }else{
+    }else if(mode==='braille'){
       var ci=0;
       for(var cy=0;cy<10;cy++)for(var cxx=0;cxx<30;cxx++){
         var bx=cxx*2,by=cy*4,b=0;
@@ -598,6 +602,17 @@ var BLE={
         if(buf[(by+3)*60+bx  ])b|=0x40;  // dot7
         if(buf[(by+3)*60+bx+1])b|=0x80;  // dot8
         out[ci++]=b;
+      }
+    }else{
+      // 'cells' — DotPad graphic standard (column-sequential bits)
+      var ci2=0;
+      for(var gy=0;gy<10;gy++)for(var gx=0;gx<30;gx++){
+        var px=gx*2,py=gy*4,bb=0;
+        for(var r=0;r<4;r++){
+          if(buf[(py+r)*60+px  ])bb|=(1<<r);      // left column: bit0..3 top->bottom
+          if(buf[(py+r)*60+px+1])bb|=(1<<(r+4));  // right column: bit4..7 top->bottom
+        }
+        out[ci2++]=bb;
       }
     }
     return out;
@@ -764,6 +779,29 @@ var BLE={
 };
 document.getElementById('bleBtn').addEventListener('click',function(){
   BLE.connected?BLE.disconnect():BLE.connect();
+});
+
+/* ═══════════ DEPLOY EDITION: SYNC TEST PATTERN ═══════════
+   시뮬레이터와 실기기가 1:1로 같아야 하는 검증 패턴.
+   판별법 — 기기에서 다르게 보이면:
+   · L 마커가 좌하단에 → 상하 반전 / 우상단에 → 좌우 반전
+   · 원이 찌그러지거나 줄무늬 → 셀 비트 매핑 불일치(SETUP에서 인코딩 변경)
+   · 패턴이 한 칸씩 밀림 → 셀 정렬(시작 인덱스) 문제                       */
+var SYNC={
+  id:-1,name:'SYNC TEST',description:'시뮬레이터-실기기 정렬 검증 패턴',request:'(진단)',
+  tts_intro:'싱크 테스트 패턴입니다. 테두리 사각형, 좌상단에서 우하단으로 향하는 대각선, 좌상단 엘 마커, 중앙 원, 우상단 사각 점이 기기와 화면에서 동일해야 합니다.',
+  code:[
+"dp.clear();",
+"dp.rect(0,0,60,40);",
+"dp.line(0,0,59,39);",
+"dp.line(2,2,2,8);dp.line(2,8,8,8);",
+"dp.circle(30,20,6);",
+"dp.rect(55,2,3,3,{fill:true});",
+"dp.text('sync',12,33);"
+  ].join('\n')
+};
+document.getElementById('syncBtn').addEventListener('click',function(){
+  loadFeature(SYNC);
 });
 
 </script>
