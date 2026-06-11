@@ -251,6 +251,7 @@
             <button class="chip">가위바위보 게임</button>
             <button class="chip">간단한 미로 게임</button>
             <button class="chip">사인 곡선 그래프</button>
+            <button class="chip">라이브 점자 자막</button>
           </div>
         </div>
       </div>
@@ -329,6 +330,13 @@
             <option value="res-180">withResponse &middot; 180B</option>
           </select>
         </div>
+      </div>
+      <div class="field">
+        <label>Braille Grade</label>
+        <select id="cfgGrade">
+          <option value="g2">약자·약어 적용 — 한국 점자 규정 + UEB Grade 2 (기본)</option>
+          <option value="g1">기본형 — 자모/알파벳 풀어쓰기 (검수·디버그용)</option>
+        </select>
       </div>
       <div class="field">
         <div class="note">BLE는 저장소에 <span style="color:var(--ink-soft)">DotPadSDK-3.0.0.js</span>가 있으면 공식 SDK로 연결됩니다(스캔·패킷·ACK·하드웨어 키 자동 처리). 위 UUID/인코딩/쓰기 설정은 SDK 파일이 없을 때의 raw 폴백 전용입니다.</div>
@@ -424,12 +432,45 @@ var navEl=document.getElementById('nav');
 addEventListener('scroll',function(){navEl.classList.toggle('scrolled',scrollY>30)},{passive:true});
 
 /* SIMULATOR RENDERER */
-var W=60,H=40,PITCH=11,PAD=6;
+var W=60,H=40,PITCH=11,PAD=6,TGAP=16,TROWS=4;
+var CANVAS_W=W*PITCH+PAD*2, CANVAS_H=H*PITCH+TGAP+TROWS*PITCH+PAD*2;
 var canvas=document.getElementById('pad'),ctx=canvas.getContext('2d');
 var DPR=Math.min(window.devicePixelRatio||1,2);
-canvas.width=(W*PITCH+PAD*2)*DPR;canvas.height=(H*PITCH+PAD*2)*DPR;canvas.style.width=(W*PITCH+PAD*2)+'px';ctx.scale(DPR,DPR);
+canvas.width=CANVAS_W*DPR;canvas.height=CANVAS_H*DPR;canvas.style.width=CANVAS_W+'px';ctx.scale(DPR,DPR);
 var frameBuf=new Uint8Array(W*H),rafQueued=false;
-function paint(){rafQueued=false;ctx.fillStyle='#000';ctx.fillRect(0,0,W*PITCH+PAD*2,H*PITCH+PAD*2);for(var y=0;y<H;y++)for(var x2=0;x2<W;x2++){var cx=PAD+x2*PITCH+PITCH/2,cy=PAD+y*PITCH+PITCH/2;if(frameBuf[y*W+x2]){ctx.beginPath();ctx.arc(cx,cy+0.6,4.4,0,7);ctx.fillStyle='rgba(0,0,0,.6)';ctx.fill();ctx.beginPath();ctx.arc(cx,cy,4.2,0,7);ctx.fillStyle='#F2F2F2';ctx.fill();ctx.beginPath();ctx.arc(cx-1.2,cy-1.2,1.5,0,7);ctx.fillStyle='#FFF';ctx.fill();}else{ctx.beginPath();ctx.arc(cx,cy,1.5,0,7);ctx.fillStyle='#2A2A2A';ctx.fill();}}}
+var textBuf=new Uint8Array(20);                       // braille text line: 20 cells, bit0..7 = dot1..8
+function drawPin(cx,cy,on){
+  if(on){
+    ctx.beginPath();ctx.arc(cx,cy+0.6,4.4,0,7);ctx.fillStyle='rgba(0,0,0,.6)';ctx.fill();
+    ctx.beginPath();ctx.arc(cx,cy,4.2,0,7);ctx.fillStyle='#F2F2F2';ctx.fill();
+    ctx.beginPath();ctx.arc(cx-1.2,cy-1.2,1.5,0,7);ctx.fillStyle='#FFF';ctx.fill();
+  }else{
+    ctx.beginPath();ctx.arc(cx,cy,1.5,0,7);ctx.fillStyle='#2A2A2A';ctx.fill();
+  }
+}
+// braille cell pin layout: [col,row,dotNo]
+var CELL_PINS=[[0,0,1],[0,1,2],[0,2,3],[0,3,7],[1,0,4],[1,1,5],[1,2,6],[1,3,8]];
+function paint(){
+  rafQueued=false;
+  ctx.fillStyle='#000';ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+  // graphic area 60x40
+  for(var y=0;y<H;y++)for(var x2=0;x2<W;x2++){
+    drawPin(PAD+x2*PITCH+PITCH/2, PAD+y*PITCH+PITCH/2, frameBuf[y*W+x2]);
+  }
+  // divider + label
+  var ty=PAD+H*PITCH+TGAP;
+  ctx.strokeStyle='#1A1A1A';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(PAD,ty-TGAP/2);ctx.lineTo(CANVAS_W-PAD,ty-TGAP/2);ctx.stroke();
+  ctx.fillStyle='#5E5E5E';ctx.font='8px ui-monospace,monospace';ctx.fillText('TEXT 20',PAD,ty-TGAP/2-3);
+  // braille text line: 20 cells, 2x4 pins each, 1-pin gap between cells
+  for(var c=0;c<20;c++){
+    var bx=PAD+c*3*PITCH, b=textBuf[c];
+    for(var p=0;p<8;p++){
+      var pin=CELL_PINS[p];
+      drawPin(bx+pin[0]*PITCH+PITCH/2, ty+pin[1]*PITCH+PITCH/2, b&(1<<(pin[2]-1)));
+    }
+  }
+}
 function requestPaint(){if(!rafQueued){rafQueued=true;requestAnimationFrame(paint);}if(window.BLE&&BLE.connected)BLE.push(frameBuf);}
 paint();
 
@@ -437,11 +478,243 @@ paint();
 var BRAILLE={a:[1],b:[1,2],c:[1,4],d:[1,4,5],e:[1,5],f:[1,2,4],g:[1,2,4,5],h:[1,2,5],i:[2,4],j:[2,4,5],k:[1,3],l:[1,2,3],m:[1,3,4],n:[1,3,4,5],o:[1,3,5],p:[1,2,3,4],q:[1,2,3,4,5],r:[1,2,3,5],s:[2,3,4],t:[2,3,4,5],u:[1,3,6],v:[1,2,3,6],w:[2,4,5,6],x:[1,3,4,6],y:[1,3,4,5,6],z:[1,3,5,6],'.':[2,5,6],',':[2],'-':[3,6],':':[2,5],'?':[2,3,6],'!':[2,3,5],"'":[3],'/':[3,4],' ':[]};
 var NUMSIGN=[3,4,5,6],DIGITMAP={'1':'a','2':'b','3':'c','4':'d','5':'e','6':'f','7':'g','8':'h','9':'i','0':'j'};
 function drawCell(buf,dots,x,y){var pos={1:[0,0],2:[0,1],3:[0,2],4:[1,0],5:[1,1],6:[1,2]};for(var n=0;n<dots.length;n++){var p=pos[dots[n]],px=x+p[0],py=y+p[1];if(px>=0&&px<W&&py>=0&&py<H)buf[py*W+px]=1;}}
+function dotsToByte(dots){var b=0;for(var i=0;i<dots.length;i++)b|=(1<<(dots[i]-1));return b;}
+
+/* ── 한국 점자 기본형 표 (초성/중성/종성, 약자 미적용) ──
+   각 항목은 셀 배열(겹자모·된소리는 복수 셀). 초성 ㅇ은 무표기. */
+var KCHO=[ [[4]], [[6],[4]], [[1,4]], [[2,4]], [[6],[2,4]], [[5]], [[1,5]], [[4,5]], [[6],[4,5]],
+  [[6]], [[6],[6]], [], [[4,6]], [[6],[4,6]], [[5,6]], [[1,2,4]], [[1,2,5]], [[1,4,5]], [[2,4,5]] ];
+var KJUNG=[ [[1,2,6]], [[1,2,3,5]], [[3,4,5]], [[3,4,5],[1,2,3,5]], [[2,3,4]], [[1,3,4,5]],
+  [[1,5,6]], [[3,4]], [[1,3,6]], [[1,2,3,6]], [[1,2,3,6],[1,2,3,5]], [[1,3,4,5,6]], [[3,4,6]],
+  [[1,3,4]], [[1,2,3,4]], [[1,2,3,4],[1,2,3,5]], [[1,3,4],[1,2,3,5]], [[1,4,6]], [[2,4,6]],
+  [[2,4,5,6]], [[1,3,5]] ];
+var KJONG=[ [], [[1]], [[1],[1]], [[1],[3]], [[2,5]], [[2,5],[1,3]], [[2,5],[3,5,6]], [[3,5]],
+  [[2]], [[2],[1]], [[2],[2,6]], [[2],[1,2]], [[2],[3]], [[2],[2,3,6]], [[2],[2,5,6]], [[2],[3,5,6]],
+  [[2,6]], [[1,2]], [[1,2],[3]], [[3]], [[3,4]], [[2,3,5,6]], [[1,3]], [[2,3]], [[2,3,5]],
+  [[2,3,6]], [[2,5,6]], [[3,5,6]] ];
+
+/* ══════════ 점자 변환기: 한국 점자 약자·약어(개정 한국 점자 규정) + UEB Grade 2 핵심 ══════════ */
+
+/* ── 한국 점자 약자 데이터 (규정 제13~18항) ── */
+// ㅏ 생략 약자 (제13항): cho index -> cells. ㄹ/ㅇ/ㅊ 제외, 된소리는 된소리표(6) 선행
+var KR_A={0:[[1,2,4,6]],1:[[6],[1,2,4,6]],2:[[1,4]],3:[[2,4]],4:[[6],[2,4]],6:[[1,5]],7:[[4,5]],8:[[6],[4,5]],
+          9:[[1,2,3]],10:[[6],[1,2,3]],12:[[4,6]],13:[[6],[4,6]],15:[[1,2,4]],16:[[1,2,5]],17:[[1,4,5]],18:[[2,4,5]]};
+// 제14항 모음 제약 대상(나다마바자카타파하 + 된소리 짝)
+var KR_A_VRESTRICT={2:1,3:1,4:1,6:1,7:1,8:1,12:1,13:1,15:1,16:1,17:1,18:1};
+// 종성 분해: jong index -> 자음 토큰 배열
+var JONG_PARTS=[[],['g'],['g','g'],['g','s'],['n'],['n','j'],['n','h'],['d'],['l'],['l','g'],['l','m'],
+  ['l','b'],['l','s'],['l','t'],['l','p'],['l','h'],['m'],['b'],['b','s'],['s'],['ss'],['ng'],['j'],['ch'],['k'],['t'],['p'],['h']];
+// 받침 단일 자음 점형
+var JONG_DOT={g:[1],n:[2,5],d:[3,5],l:[2],m:[2,6],b:[1,2],s:[3],ss:[3,4],ng:[2,3,5,6],j:[1,3],ch:[2,3],k:[2,3,5],t:[2,3,6],p:[2,5,6],h:[3,5,6]};
+// 라임 약자 (제15항): jung index + 첫 종성 토큰 -> 점형
+var KR_RIME={'4g':[1,4,5,6],'4n':[2,3,4,5,6],'4l':[2,3,4,5],'6n':[1,6],'6l':[1,2,5,6],'6ng':[1,2,4,5,6],
+  '8g':[1,3,4,6],'8n':[1,2,3,5,6],'8ng':[1,2,3,4,5,6],'13n':[1,2,4,5],'13l':[1,2,3,4,6],
+  '18n':[1,3,5,6],'18l':[2,3,4,6],'20n':[1,2,3,4,5]};
+// 약어 (제18항): 어두에서만, 긴 것 우선
+var KR_ABBR=[['그리하여',[[1],[1,5,6]]],['그러므로',[[1],[2,6]]],['그러면',[[1],[2,5]]],['그런데',[[1],[1,3,4,5]]],
+  ['그래서',[[1],[2,3,4]]],['그러나',[[1],[1,4]]],['그리고',[[1],[1,3,6]]]];
+
+function isHangul(code){return code>=0xAC00&&code<=0xD7A3;}
+
+/* 한 음절 -> 셀 배열. nextIsVowelSyll = 같은 단어 내 다음 음절 첫소리가 ㅇ */
+function encodeKrSyllable(code,nextIsVowelSyll){
+  var c=code-0xAC00,cho=(c/588)|0,jung=((c%588)/28)|0,jong=c%28;
+  var parts=JONG_PARTS[jong],out=[],i;
+  // 것/껏 (제13·16항)
+  if(jung===4&&jong===19&&(cho===0||cho===1)){
+    if(cho===1)out.push([6]);
+    out.push([4,5,6]);out.push([2,3,4]);return out;
+  }
+  // ㅏ 생략 약자 (제13·14·16항)
+  if(jung===0&&KR_A[cho]){
+    var blocked=false;
+    if(jong===0&&nextIsVowelSyll&&KR_A_VRESTRICT[cho])blocked=true;     // 제14항
+    if(cho===17&&jong===20)blocked=true;                                // 제14항 붙임: 팠
+    if(!blocked){
+      var base=KR_A[cho];
+      for(i=0;i<base.length;i++)out.push(base[i]);
+      for(i=0;i<parts.length;i++)out.push(JONG_DOT[parts[i]]);
+      return out;
+    }
+  }
+  // 제17항: 성·썽·정·쩡·청 = ㅅ·ㅆ·ㅈ·ㅉ·ㅊ + 영(12456) 약자
+  if(jung===4&&jong===21&&(cho===9||cho===10||cho===12||cho===13||cho===14)){
+    var cc=KCHO[cho];
+    for(i=0;i<cc.length;i++)out.push(cc[i]);
+    out.push([1,2,4,5,6]);return out;
+  }
+  // 라임 약자 (제15항): 중성+첫 종성
+  if(parts.length){
+    var rime=KR_RIME[jung+''+parts[0]];
+    if(rime){
+      var choCells=KCHO[cho];
+      for(i=0;i<choCells.length;i++)out.push(choCells[i]);
+      out.push(rime);
+      for(i=1;i<parts.length;i++)out.push(JONG_DOT[parts[i]]);
+      return out;
+    }
+  }
+  // 풀어쓰기 (자모)
+  var seq=KCHO[cho].concat(KJUNG[jung]).concat(KJONG[jong]);
+  for(i=0;i<seq.length;i++)out.push(seq[i]);
+  return out;
+}
+
+/* ── UEB Grade 2 핵심 (통일영어점자 규정 제10장) ── */
+var L={a:[1],b:[1,2],c:[1,4],d:[1,4,5],e:[1,5],f:[1,2,4],g:[1,2,4,5],h:[1,2,5],i:[2,4],j:[2,4,5],k:[1,3],l:[1,2,3],m:[1,3,4],n:[1,3,4,5],o:[1,3,5],p:[1,2,3,4],q:[1,2,3,4,5],r:[1,2,3,5],s:[2,3,4],t:[2,3,4,5],u:[1,3,6],v:[1,2,3,6],w:[2,4,5,6],x:[1,3,4,6],y:[1,3,4,5,6],z:[1,3,5,6]};
+// 알파벳 단어 약자 + 온칸 단어 약자 + 하위 단어 약자 + 온칸 약자(단어로) + 어두 약자(단어로)
+var EN_WORD={but:[L.b],can:[L.c],do:[L.d],every:[L.e],from:[L.f],go:[L.g],have:[L.h],just:[L.j],
+  knowledge:[L.k],like:[L.l],more:[L.m],not:[L.n],people:[L.p],quite:[L.q],rather:[L.r],so:[L.s],
+  that:[L.t],us:[L.u],very:[L.v],will:[L.w],it:[L.x],you:[L.y],as:[L.z],
+  child:[[1,6]],shall:[[1,4,6]],this:[[1,4,5,6]],which:[[1,5,6]],out:[[1,2,5,6]],still:[[3,4]],
+  and:[[1,2,3,4,6]],'for':[[1,2,3,4,5,6]],of:[[1,2,3,5,6]],the:[[2,3,4,6]],'with':[[2,3,4,5,6]],
+  be:[[2,3]],enough:[[2,6]],were:[[2,3,5,6]],his:[[2,3,6]],'in':[[3,5]],was:[[3,5,6]],
+  day:[[5],L.d],ever:[[5],L.e],father:[[5],L.f],here:[[5],L.h],know:[[5],L.k],lord:[[5],L.l],
+  mother:[[5],L.m],name:[[5],L.n],one:[[5],L.o],part:[[5],L.p],question:[[5],L.q],right:[[5],L.r],
+  some:[[5],L.s],time:[[5],L.t],under:[[5],L.u],work:[[5],L.w],young:[[5],L.y],
+  there:[[5],[2,3,4,6]],character:[[5],[1,6]],through:[[5],[1,4,5,6]],where:[[5],[1,5,6]],ought:[[5],[1,2,5,6]],
+  upon:[[4,5],L.u],word:[[4,5],L.w],these:[[4,5],[2,3,4,6]],those:[[4,5],[1,4,5,6]],whose:[[4,5],[1,5,6]],
+  cannot:[[4,5,6],L.c],had:[[4,5,6],L.h],many:[[4,5,6],L.m],spirit:[[4,5,6],L.s],world:[[4,5,6],L.w],their:[[4,5,6],[2,3,4,6]]};
+// 축어 (부록 1 핵심): 단어 -> 축약 글자열(내부 약자 재적용)
+var EN_SHORT={about:'ab',above:'abv',according:'ac',across:'acr',after:'af',afternoon:'afn',afterward:'afw',
+  again:'ag',against:'agst',almost:'alm',already:'alr',also:'al',although:'alth',altogether:'alt',always:'alw',
+  because:'bec',before:'bef',behind:'beh',below:'bel',beneath:'ben',beside:'bes',between:'bet',beyond:'bey',
+  blind:'bl',braille:'brl',children:'chn',conceive:'concv',could:'cd',deceive:'dcv',declare:'dcl',either:'ei',
+  first:'fst',friend:'fr',good:'gd',great:'grt',herself:'herf',him:'hm',himself:'hmf',immediate:'imm',
+  its:'xs',itself:'xf',letter:'lr',little:'ll',much:'mch',must:'mst',myself:'myf',necessary:'nec',neither:'nei',
+  oneself:'onef',ourselves:'ourvs',paid:'pd',perceive:'percv',perhaps:'perh',quick:'qk',receive:'rcv',
+  rejoice:'rjc',said:'sd',should:'shd',such:'sch',themselves:'themvs',thyself:'thyf',today:'td',
+  together:'tgr',tomorrow:'tm',tonight:'tn',would:'wd',your:'yr',yourself:'yrf',yourselves:'yrvs'};
+// 어미 묶음 약자 (10.8)
+var EN_FINAL=[['ound',[[4,6],L.d]],['ance',[[4,6],L.e]],['sion',[[4,6],L.n]],['less',[[4,6],L.s]],['ount',[[4,6],L.t]],
+  ['ence',[[5,6],L.e]],['ong',[[5,6],L.g]],['ful',[[5,6],L.l]],['tion',[[5,6],L.n]],['ness',[[5,6],L.s]],['ment',[[5,6],L.t]],['ity',[[5,6],L.y]]];
+// 묶음 약자 (10.4/10.6): [패턴, 점형, 위치규칙] 규칙: any|mid|notstart
+var EN_SEQ=[['and',[[1,2,3,4,6]],'any'],['for',[[1,2,3,4,5,6]],'any'],['the',[[2,3,4,6]],'any'],
+  ['with',[[2,3,4,5,6]],'any'],['of',[[1,2,3,5,6]],'any'],
+  ['ing',[[3,4,6]],'notstart'],['ch',[[1,6]],'any'],['gh',[[1,2,6]],'any'],['sh',[[1,4,6]],'any'],
+  ['th',[[1,4,5,6]],'any'],['wh',[[1,5,6]],'any'],['ed',[[1,2,4,6]],'any'],['er',[[1,2,4,5,6]],'any'],
+  ['ou',[[1,2,5,6]],'any'],['ow',[[2,4,6]],'any'],['ar',[[3,4,5]],'any'],['st',[[3,4]],'any'],
+  ['ea',[[2]],'mid'],['bb',[[2,3]],'mid'],['cc',[[2,5]],'mid'],['ff',[[2,3,5]],'mid'],['gg',[[2,3,5,6]],'mid'],
+  ['en',[[2,6]],'any'],['in',[[3,5]],'any']];
+var EN_START=[['be',[[2,3]]],['con',[[2,5]]],['dis',[[2,5,6]]]];   // 어두 음절 근사 적용
+var VOWELS={a:1,e:1,i:1,o:1,u:1};
+
+// 단어 일부로도 쓸 수 있는 약자(어두 약자 등, 긴 것 우선)
+var EN_PREFIX=['character','question','cannot','through','mother','spirit','father','world',
+  'their','these','those','whose','under','where','there','right','young','ought','know','lord',
+  'name','part','some','time','work','here','ever','word','upon','many','had','day','one'];
+function encodeEnWord(word){          // word: 소문자, g2
+  var out=[],i;
+  if(EN_WORD[word]){return EN_WORD[word].slice();}
+  if(EN_SHORT[word]){return encodeEnSeq(EN_SHORT[word],false);}
+  var pre=[],rest=word,midStart=false;
+  for(i=0;i<EN_PREFIX.length;i++){    // 어두 약자를 단어 접두로 (working = work+ing)
+    var pk=EN_PREFIX[i];
+    if(word.length>pk.length&&word.slice(0,pk.length)===pk){
+      pre=EN_WORD[pk].slice();rest=word.slice(pk.length);midStart=true;break;
+    }
+  }
+  var tail=[];
+  for(i=0;i<EN_FINAL.length;i++){     // 어미 묶음: 앞에 글자가 있을 때만
+    var f=EN_FINAL[i];
+    if(rest.length>f[0].length&&rest.slice(-f[0].length)===f[0]){
+      tail=f[1].slice();rest=rest.slice(0,-f[0].length);break;
+    }
+  }
+  var head=[];
+  if(!midStart){
+    for(i=0;i<EN_START.length;i++){   // be/con/dis: 뒤가 자음이고 충분히 길 때만(음절 근사)
+      var st=EN_START[i],p=st[0];
+      if(rest.length>=p.length+2&&rest.slice(0,p.length)===p&&!VOWELS[rest[p.length]]){
+        head=st[1].slice();rest=rest.slice(p.length);midStart=true;break;
+      }
+    }
+  }
+  return pre.concat(head).concat(encodeEnSeq(rest,midStart)).concat(tail);
+}
+function encodeEnSeq(str,midStart){   // 묶음 약자 greedy
+  var out=[],i=0,n=str.length;
+  while(i<n){
+    var hit=null;
+    for(var k=0;k<EN_SEQ.length;k++){
+      var q=EN_SEQ[k],p=q[0];
+      if(str.substr(i,p.length)!==p)continue;
+      var atStart=(i===0&&!midStart);
+      if(q[2]==='mid'&&(atStart||i+p.length>=n))continue;
+      if(q[2]==='notstart'&&atStart)continue;
+      hit=q;break;
+    }
+    if(hit){for(var c=0;c<hit[1].length;c++)out.push(hit[1][c]);i+=hit[0].length;}
+    else{var cell=L[str[i]];if(cell)out.push(cell);i++;}
+  }
+  return out;
+}
+
+/* ── 통합 변환기: 문자열 -> 6점 셀 시퀀스 ── */
+function brailleCells(str){
+  var out=[],numMode=false,sl=String(str),n=sl.length,k=0;
+  var grade=(window.SD&&SD.cfg.grade)||'g2';
+  function prevHangul(idx){return idx>0&&isHangul(sl.charCodeAt(idx-1));}
+  while(k<n){
+    var ch=sl[k],code=ch.charCodeAt(0);
+    if(isHangul(code)){
+      numMode=false;
+      // 약어 (제18항): 앞이 한글이 아닐 때만
+      if(grade!=='g1'&&!prevHangul(k)){
+        var hit=null;
+        for(var a=0;a<KR_ABBR.length;a++){
+          var w=KR_ABBR[a][0];
+          if(sl.substr(k,w.length)===w){hit=KR_ABBR[a];break;}
+        }
+        if(hit){for(var c2=0;c2<hit[1].length;c2++)out.push(hit[1][c2]);k+=hit[0].length;continue;}
+      }
+      if(grade==='g1'){
+        var c0=code-0xAC00,seq0=KCHO[(c0/588)|0].concat(KJUNG[((c0%588)/28)|0]).concat(KJONG[c0%28]);
+        for(var q0=0;q0<seq0.length;q0++)out.push(seq0[q0]);k++;continue;
+      }
+      var nextVowel=false;
+      if(k+1<n&&isHangul(sl.charCodeAt(k+1))){
+        var nc=sl.charCodeAt(k+1)-0xAC00;
+        if(((nc/588)|0)===11)nextVowel=true;       // 다음 첫소리 ㅇ
+      }
+      var cells=encodeKrSyllable(code,nextVowel);
+      for(var c3=0;c3<cells.length;c3++)out.push(cells[c3]);
+      k++;continue;
+    }
+    if(/[A-Za-z]/.test(ch)){
+      numMode=false;
+      var j=k;while(j<n&&/[A-Za-z]/.test(sl[j]))j++;
+      var word=sl.slice(k,j);
+      var caps=word.length>1&&word===word.toUpperCase()&&/[A-Z]/.test(word);
+      if(caps)out.push([6]),out.push([6]);
+      else if(/[A-Z]/.test(word[0]))out.push([6]);
+      var lower=word.toLowerCase();
+      var enc=(grade==='g1')?encodeEnSeqG1(lower):encodeEnWord(lower);
+      for(var c4=0;c4<enc.length;c4++)out.push(enc[c4]);
+      k=j;continue;
+    }
+    if(DIGITMAP[ch]){
+      if(!numMode){out.push(NUMSIGN);numMode=true;}
+      out.push(BRAILLE[DIGITMAP[ch]]);k++;continue;
+    }
+    numMode=false;
+    out.push(BRAILLE[ch]||[]);k++;
+  }
+  return out;
+}
+function encodeEnSeqG1(str){var out=[];for(var i=0;i<str.length;i++){var c=L[str[i]];if(c)out.push(c);}return out;}
+/* 문자열 -> 20셀 점자 바이트 배열 (한글/영문/숫자, dot1..8=bit0..7) */
+function strToTextCells(str){
+  var seq=brailleCells(str),cells=[];
+  for(var i=0;i<seq.length&&cells.length<20;i++)cells.push(dotsToByte(seq[i]));
+  while(cells.length<20)cells.push(0);
+  return cells;
+}
 
 /* dp RUNTIME */
 var currentDP=null;
 function createDP(){
-  var timers=[],keyHandler=null,dead=false;
+  var timers=[],keyHandler=null,dead=false,recog=null;
   var dp={W:W,H:H,state:{},
     clear:function(){frameBuf.fill(0);requestPaint();},
     set:function(x,y,v){v=v===undefined?1:v;x|=0;y|=0;if(x>=0&&x<W&&y>=0&&y<H){frameBuf[y*W+x]=v?1:0;requestPaint();}},
@@ -449,13 +722,56 @@ function createDP(){
     line:function(x0,y0,x1,y1,v){v=v===undefined?1:v;x0|=0;y0|=0;x1|=0;y1|=0;var dx=Math.abs(x1-x0),dy=Math.abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1,err=dx-dy;while(true){dp.set(x0,y0,v);if(x0===x1&&y0===y1)break;var e2=2*err;if(e2>-dy){err-=dy;x0+=sx;}if(e2<dx){err+=dx;y0+=sy;}}},
     rect:function(x,y,w,h,o){o=o||{};x|=0;y|=0;w|=0;h|=0;if(o.fill){for(var j=y;j<y+h;j++)for(var i=x;i<x+w;i++)dp.set(i,j,1);}else{dp.line(x,y,x+w-1,y);dp.line(x,y+h-1,x+w-1,y+h-1);dp.line(x,y,x,y+h-1);dp.line(x+w-1,y,x+w-1,y+h-1);}},
     circle:function(cx,cy,r,o){o=o||{};cx|=0;cy|=0;r|=0;for(var y2=-r;y2<=r;y2++)for(var x2=-r;x2<=r;x2++){var d=Math.sqrt(x2*x2+y2*y2);if(o.fill?d<=r+0.3:Math.abs(d-r)<0.6)dp.set(cx+x2,cy+y2,1);}},
-    text:function(str,x,y){x|=0;y|=0;var numMode=false,s=String(str).toLowerCase();for(var k=0;k<s.length;k++){var ch=s[k];if(x+1>=W)break;if(DIGITMAP[ch]){if(!numMode){drawCell(frameBuf,NUMSIGN,x,y);x+=3;numMode=true;if(x+1>=W)break;}drawCell(frameBuf,BRAILLE[DIGITMAP[ch]],x,y);}else{numMode=false;drawCell(frameBuf,BRAILLE[ch]||[],x,y);}x+=3;}requestPaint();return x;},
+    text:function(str,x,y){x|=0;y|=0;var seq=brailleCells(str);for(var k=0;k<seq.length;k++){if(x+1>=W)break;drawCell(frameBuf,seq[k],x,y);x+=3;}requestPaint();return x;},
+    brailleCells:function(str){return brailleCells(str);},
+    textLine:function(str){
+      if(dead)return;
+      var cells=strToTextCells(str);
+      for(var i=0;i<20;i++)textBuf[i]=cells[i];
+      requestPaint();
+      if(window.BLE&&BLE.connected)BLE.pushText(textBuf);
+    },
+    clearText:function(){
+      if(dead)return;
+      textBuf.fill(0);requestPaint();
+      if(window.BLE&&BLE.connected)BLE.pushText(textBuf);
+    },
     speak:function(text){if(!dead)tts(String(text));},
+    listen:function(fn){
+      if(dead)return false;
+      var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+      if(!SR){tts('이 브라우저는 음성 인식을 지원하지 않습니다. 크롬에서 열어주세요.');return false;}
+      dp.stopListen();
+      recog=new SR();recog.lang='ko-KR';recog.continuous=true;recog.interimResults=true;
+      recog.onresult=function(e){
+        if(dead)return;
+        var fin='',tmp='';
+        for(var i=e.resultIndex;i<e.results.length;i++){
+          var r=e.results[i];
+          if(r.isFinal)fin+=r[0].transcript;else tmp+=r[0].transcript;
+        }
+        try{
+          if(fin)fn(fin,true);
+          fn(tmp,false);
+        }catch(err){logErr('listen 콜백 오류: '+err.message);}
+      };
+      recog.onerror=function(e){
+        if(e.error==='not-allowed')logErr('마이크 권한이 거부되었습니다');
+      };
+      recog.onend=function(){
+        if(!dead&&recog){try{recog.start();}catch(e){}}   // 연속 모드 자동 재시작
+      };
+      try{recog.start();logRow('<span class="key">[MIC] 연속 음성 인식 시작</span>');}catch(e){logErr('음성 인식 시작 실패: '+e.message);return false;}
+      return true;
+    },
+    stopListen:function(){
+      if(recog){var r=recog;recog=null;try{r.onend=null;r.stop();}catch(e){}}
+    },
     onKey:function(fn){keyHandler=fn;},
     interval:function(ms,fn){var id=setInterval(function(){if(!dead)fn();},ms);timers.push(id);return id;},
     timeout:function(ms,fn){var id=setTimeout(function(){if(!dead)fn();},ms);timers.push(id);return id;},
     _fireKey:function(k){if(keyHandler&&!dead){try{keyHandler(k);}catch(e){logErr('키 핸들러 오류: '+e.message);}}},
-    _destroy:function(){dead=true;timers.forEach(function(id){clearInterval(id);clearTimeout(id);});keyHandler=null;}
+    _destroy:function(){dead=true;if(recog){var r=recog;recog=null;try{r.onend=null;r.stop();}catch(e){}}timers.forEach(function(id){clearInterval(id);clearTimeout(id);});keyHandler=null;}
   };
   return dp;
 }
@@ -475,7 +791,7 @@ function loadFeature(feature,speakIntro){
   if(speakIntro===undefined)speakIntro=true;
   if(currentDP)currentDP._destroy();
   try{speechSynthesis.cancel();}catch(e){}
-  frameBuf.fill(0);requestPaint();
+  frameBuf.fill(0);textBuf.fill(0);requestPaint();
   currentDP=createDP();currentFeature=feature;
   featureNameEl.textContent=feature.name||'\u2014';
   codeView.textContent=feature.code;codeBox.hidden=false;
@@ -502,7 +818,10 @@ var SYSTEM_PROMPT=[
 '',
 'code 작성 규칙:',
 '- 제공되는 dp 객체만 사용. 코드는 최상위에서 1회 실행됨. DOM/window/fetch 접근 금지.',
-'- API: dp.W(=60), dp.H(=40), dp.clear(), dp.set(x,y,v), dp.get(x,y), dp.line(x0,y0,x1,y1), dp.rect(x,y,w,h,{fill:true}), dp.circle(cx,cy,r,{fill:true}), dp.text(str,x,y) — 영문/숫자만 점자 출력(글자당 가로3칸 세로4칸), dp.speak(텍스트) — 한국어 TTS, dp.onKey(fn) — fn(key)로 키 수신(key 값: "F1","F2","F3","F4","PAN_LEFT","PAN_RIGHT"), dp.interval(ms,fn), dp.timeout(ms,fn), dp.state.',
+'- API: dp.W(=60), dp.H(=40), dp.clear() — 그래픽 영역 지움, dp.set(x,y,v), dp.get(x,y), dp.line(x0,y0,x1,y1), dp.rect(x,y,w,h,{fill:true}), dp.circle(cx,cy,r,{fill:true}), dp.textLine(str) — 별도 점자 텍스트 라인(20셀)에 영문/숫자 출력, dp.clearText(), dp.text(str,x,y) — 그래픽 영역에 큰 점자(특별한 경우만), dp.speak(텍스트) — 한국어 TTS, dp.onKey(fn) — fn(key)로 키 수신(key 값: "F1","F2","F3","F4","PAN_LEFT","PAN_RIGHT"), dp.interval(ms,fn), dp.timeout(ms,fn), dp.state.',
+'- DotPad는 그래픽 영역(60x40 핀)과 점자 텍스트 라인(20셀)이 분리되어 있습니다. 문자/숫자/라벨/상태는 반드시 dp.textLine으로, 그림/도형/그래프는 그래픽 영역에 출력하세요.',
+'- dp.text와 dp.textLine은 한글/영문 모두 지원합니다(한국 점자 약자·약어 및 UEB Grade 2로 자동 변환).',
+'- 추가 API: dp.listen(fn) — 연속 한국어 음성 인식 시작, fn(text,isFinal)로 결과 수신(isFinal=false는 중간 결과). dp.stopListen(). dp.brailleCells(str) — 문자열을 6점 점자 셀(점 번호 배열)의 배열로 변환(직접 멀티라인 점자 렌더링 시 사용, 셀당 가로3칸 세로4칸 권장).',
 '- 렌더링은 자동. flush 불필요.',
 '- 촉각 우선: 선은 가급적 굵게, 요소 간 간격 충분히, 과밀 금지.',
 '- 모든 키 상호작용에 dp.speak로 음성 피드백 필수 (시각장애인이 유일하게 받는 피드백).',
@@ -588,23 +907,97 @@ document.getElementById('exportBtn').addEventListener('click',function(){
 });
 
 /* DEMO */
-var DEMO={id:0,name:'DEMO: 분기 매출 차트',description:'4개 분기 막대그래프. F1로 탐색, 음성 안내.',request:'(내장 데모)',
-tts_intro:'분기별 매출 차트입니다. F1 키를 누르면 다음 분기로 이동하며 값을 읽어줍니다. 팬 키로 좌우 이동도 가능합니다.',
-code:["dp.clear();","var data=[['q1',32],['q2',45],['q3',28],['q4',51]];","var base=32,bw=8,gap=5;","dp.line(4,base,57,base);dp.line(4,base+1,57,base+1);","for(var i=0;i<4;i++){var h=Math.round(data[i][1]/60*26);dp.rect(8+i*(bw+gap),base-h,bw,h,{fill:true});}","dp.text('q1',9,35);dp.text('q2',22,35);dp.text('q3',35,35);dp.text('q4',48,35);","dp.state.i=-1;","function read(i){dp.speak((i+1)+'분기 매출 '+data[i][1]+'억 원');}","dp.onKey(function(k){"," if(k==='F1'||k==='PAN_RIGHT'){dp.state.i=(dp.state.i+1)%4;read(dp.state.i);}"," else if(k==='PAN_LEFT'){dp.state.i=(dp.state.i+3)%4;read(dp.state.i);}"," else if(k==='F2'&&dp.state.i>=0){read(dp.state.i);}","});"].join('\n')};
-var DICE={id:2,name:'DEMO: 주사위',description:'F1로 주사위 굴리기. 애니메이션 후 결과 음성 안내.',request:'(내장 데모)',
+var DEMO={id:0,name:'DEMO: 분기 매출 차트',description:'4개 분기 막대그래프. F1/팬 키 탐색, 텍스트 라인+음성 안내.',request:'(내장 데모)',
+tts_intro:'분기별 매출 차트입니다. F1 키나 팬 키로 분기를 이동하면 값을 읽어주고 텍스트 라인에 표시합니다.',
+code:["dp.clear();dp.textLine('sales q1-q4');",
+"var data=[['q1',32],['q2',45],['q3',28],['q4',51]];",
+"var base=34,bw=8,gap=5;",
+"dp.line(4,base,57,base);dp.line(4,base+1,57,base+1);",
+"for(var i=0;i<4;i++){var h=Math.round(data[i][1]/60*28);dp.rect(8+i*(bw+gap),base-h,bw,h,{fill:true});}",
+"dp.state.i=-1;",
+"function read(i){dp.textLine(data[i][0]+': '+data[i][1]);dp.speak((i+1)+'분기 매출 '+data[i][1]+'억 원');}",
+"dp.onKey(function(k){",
+" if(k==='F1'||k==='PAN_RIGHT'){dp.state.i=(dp.state.i+1)%4;read(dp.state.i);}",
+" else if(k==='PAN_LEFT'){dp.state.i=(dp.state.i+3)%4;read(dp.state.i);}",
+" else if(k==='F2'&&dp.state.i>=0){read(dp.state.i);}",
+"});"].join('\n')};
+var DICE={id:2,name:'DEMO: 주사위',description:'F1로 주사위 굴리기. 결과는 텍스트 라인+음성.',request:'(내장 데모)',
 tts_intro:'주사위 기능입니다. F1 키를 누르면 주사위를 굴리고 결과를 읽어줍니다.',
 code:["var P={1:[[1,1]],2:[[0,0],[2,2]],3:[[0,0],[1,1],[2,2]],4:[[0,0],[2,0],[0,2],[2,2]],5:[[0,0],[2,0],[1,1],[0,2],[2,2]],6:[[0,0],[2,0],[0,1],[2,1],[0,2],[2,2]]};",
-"function face(n){dp.clear();dp.rect(17,2,26,26);dp.rect(18,3,24,24);P[n].forEach(function(p){dp.rect(21+p[0]*8,6+p[1]*8,3,3,{fill:true});});dp.text('dice',24,31);}",
-"dp.state.busy=false;face(1);",
+"function face(n){dp.clear();dp.rect(17,4,26,26);dp.rect(18,5,24,24);P[n].forEach(function(p){dp.rect(21+p[0]*8,8+p[1]*8,3,3,{fill:true});});}",
+"dp.state.busy=false;face(1);dp.textLine('dice: press f1');",
 "dp.onKey(function(k){if(k==='F1'&&!dp.state.busy){dp.state.busy=true;var n=1+Math.floor(Math.random()*6),i=0;",
-"var t=dp.interval(90,function(){face(1+Math.floor(Math.random()*6));if(++i>5){clearInterval(t);face(n);dp.state.busy=false;dp.speak('주사위 결과 '+n);}});}});"].join('\n')};
-var CLOCK={id:3,name:'DEMO: 점자 시계',description:'현재 시각을 점자로 표시. F1로 음성 안내, 자동 갱신.',request:'(내장 데모)',
-tts_intro:'점자 시계입니다. 화면에 현재 시각이 점자로 표시되며, F1 키를 누르면 시각을 읽어줍니다.',
-code:["function draw(){var d=new Date(),h=('0'+d.getHours()).slice(-2),m=('0'+d.getMinutes()).slice(-2);",
-"dp.clear();dp.rect(0,0,60,40);dp.rect(1,1,58,38);dp.text(h+':'+m,12,14);dp.text('clock',15,28);}",
+"var t=dp.interval(90,function(){face(1+Math.floor(Math.random()*6));if(++i>5){clearInterval(t);face(n);dp.state.busy=false;dp.textLine('dice: '+n);dp.speak('주사위 결과 '+n);}});}});"].join('\n')};
+var CLOCK={id:3,name:'DEMO: 촉각 시계',description:'아날로그 시계(그래픽) + 디지털 시각(텍스트 라인). F1 음성.',request:'(내장 데모)',
+tts_intro:'촉각 시계입니다. 그래픽 영역에 아날로그 시계, 텍스트 라인에 디지털 시각이 표시됩니다. F1 키를 누르면 시각을 읽어줍니다.',
+code:["function draw(){var d=new Date(),h=d.getHours()%12,m=d.getMinutes();",
+"dp.clear();dp.circle(30,19,17);dp.set(30,3);dp.set(46,19);dp.set(30,35);dp.set(14,19);",
+"var ma=m/60*6.2832-1.5708,ha=(h+m/60)/12*6.2832-1.5708;",
+"dp.line(30,19,30+Math.round(8*Math.cos(ha)),19+Math.round(8*Math.sin(ha)));",
+"dp.line(30,19,30+Math.round(13*Math.cos(ma)),19+Math.round(13*Math.sin(ma)));",
+"dp.textLine(('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2));}",
 "draw();dp.interval(15000,draw);",
 "dp.onKey(function(k){if(k==='F1'){var d=new Date();dp.speak('현재 시각 '+d.getHours()+'시 '+d.getMinutes()+'분');}});"].join('\n')};
-library.push(DEMO);library.push(DICE);library.push(CLOCK);
+var RPS={id:4,name:'DEMO: 가위바위보',description:'F1 가위, F2 바위, F3 보. 컴퓨터 손은 그래픽, 결과는 텍스트 라인+음성.',request:'(내장 데모)',
+tts_intro:'가위바위보 게임입니다. F1은 가위, F2는 바위, F3은 보입니다. 키를 누르면 컴퓨터와 대결합니다.',
+code:["var names=['가위','바위','보'];",
+"function icon(n){dp.clear();",
+"if(n===0){dp.line(20,8,38,28);dp.line(21,8,39,28);dp.line(38,8,20,28);dp.line(39,8,21,28);}",
+"else if(n===1){dp.circle(29,18,9,{fill:true});}",
+"else{dp.rect(18,7,24,22);dp.rect(19,8,22,20);}}",
+"dp.textLine('rps: f1 f2 f3');",
+"dp.onKey(function(k){var me={'F1':0,'F2':1,'F3':2}[k];if(me===undefined)return;",
+"var cpu=Math.floor(Math.random()*3);icon(cpu);",
+"var r=(me-cpu+3)%3,txt=r===0?'draw':(r===1?'win':'lose');",
+"dp.textLine(txt);",
+"dp.speak('컴퓨터는 '+names[cpu]+'. '+(r===0?'무승부':(r===1?'당신의 승리':'당신의 패배')));});"].join('\n')};
+var MAZE={id:5,name:'DEMO: 미로 탈출',description:'F1 위, F4 아래, 팬 키 좌우. 우하단 출구까지 이동.',request:'(내장 데모)',
+tts_intro:'미로 탈출 게임입니다. F1은 위, F4는 아래, 팬 키는 좌우 이동입니다. 오른쪽 아래 출구를 찾으세요.',
+code:["var walls=[[0,0,60,2],[0,38,52,2],[0,0,2,40],[58,0,2,30],",
+"[10,2,2,26],[18,12,2,28],[28,2,2,26],[38,12,2,28],[48,2,2,20]];",
+"dp.state.x=4;dp.state.y=4;",
+"function hit(x,y){if(x<2||y<2||x>57||y>37)return!(x>=52&&y>=33);",
+"for(var i=0;i<walls.length;i++){var w=walls[i];if(x+1>=w[0]&&x<w[0]+w[2]&&y+1>=w[1]&&y<w[1]+w[3])return true;}return false;}",
+"function draw(){dp.clear();walls.forEach(function(w){dp.rect(w[0],w[1],w[2],w[3],{fill:true});});",
+"dp.rect(dp.state.x,dp.state.y,2,2,{fill:true});}",
+"draw();dp.textLine('maze: find exit');",
+"dp.onKey(function(k){var dx=0,dy=0;",
+"if(k==='F1')dy=-2;else if(k==='F4')dy=2;else if(k==='PAN_LEFT')dx=-2;else if(k==='PAN_RIGHT')dx=2;else return;",
+"var nx=dp.state.x+dx,ny=dp.state.y+dy;",
+"if(nx>=56&&ny>=32){dp.state.x=nx;dp.state.y=ny;draw();dp.textLine('escape!');dp.speak('탈출 성공! 축하합니다.');return;}",
+"if(hit(nx,ny)){dp.speak('벽입니다');return;}",
+"dp.state.x=nx;dp.state.y=ny;draw();});"].join('\n')};
+var SINE={id:6,name:'DEMO: 사인 곡선',description:'F1로 주기 변경(1~3). 텍스트 라인에 현재 주기 표시.',request:'(내장 데모)',
+tts_intro:'사인 곡선 그래프입니다. F1 키를 누르면 주기가 1에서 3 사이로 바뀝니다.',
+code:["function draw(f){dp.clear();dp.line(0,20,59,20);dp.line(2,2,2,38);",
+"for(var x=3;x<60;x++){var y=20-Math.round(15*Math.sin((x-3)/56*6.2832*f));dp.set(x,y);dp.set(x,y+(y<20?1:-1));}",
+"dp.textLine('sine x'+f);}",
+"dp.state.f=1;draw(1);",
+"dp.onKey(function(k){if(k==='F1'){dp.state.f=dp.state.f%3+1;draw(dp.state.f);dp.speak('주기 '+dp.state.f);}});"].join('\n')};
+var LIVE={id:7,name:'DEMO: 라이브 점자 자막',description:'마이크로 말하면 그래픽 영역에 멀티라인 점자 자막이 실시간 표시. F1 지우기, F2 일시정지/재개.',request:'(내장 데모)',
+tts_intro:'라이브 점자 자막입니다. 지금부터 말하면 그래픽 영역에 점자로 실시간 표시됩니다. 화면이 차면 자동으로 넘어갑니다. F1은 지우기, F2는 일시정지와 재개입니다.',
+code:["var PER=20,LINES=8,GAPY=5,POS={1:[0,0],2:[0,1],3:[0,2],4:[1,0],5:[1,1],6:[1,2]};",
+"dp.state.txt='';dp.state.tmp='';dp.state.on=true;",
+"function render(){",
+" var cells=dp.brailleCells(dp.state.txt+dp.state.tmp),max=PER*LINES,off=0;",
+" if(cells.length>max)off=Math.ceil((cells.length-max)/PER)*PER;",
+" dp.clear();",
+" for(var i=off;i<cells.length;i++){",
+"  var n=i-off,x=(n%PER)*3,y=Math.floor(n/PER)*GAPY,dots=cells[i];",
+"  for(var d=0;d<dots.length;d++){var p=POS[dots[d]];dp.set(x+p[0],y+p[1]);}",
+" }",
+"}",
+"dp.textLine('live caption');render();",
+"dp.listen(function(t,fin){",
+" if(!dp.state.on)return;",
+" if(fin){dp.state.txt+=t+' ';dp.state.tmp='';}else{dp.state.tmp=t;}",
+" render();",
+"});",
+"dp.onKey(function(k){",
+" if(k==='F1'){dp.state.txt='';dp.state.tmp='';render();dp.speak('자막을 지웠습니다');}",
+" else if(k==='F2'){dp.state.on=!dp.state.on;dp.textLine(dp.state.on?'live caption':'paused');dp.speak(dp.state.on?'자막 재개':'자막 일시정지');}",
+"});"].join('\n')};
+library.push(DEMO);library.push(DICE);library.push(CLOCK);library.push(RPS);library.push(MAZE);library.push(SINE);library.push(LIVE);
 loadFeature(DEMO,false);renderLibrary();
 
 /* ═══════════ DEPLOY EDITION: SETTINGS ═══════════ */
@@ -615,10 +1008,10 @@ var SD={
 };
 (function(){
   var bg=document.getElementById('modalBg');
-  var fApi=document.getElementById('cfgApi'),fSvc=document.getElementById('cfgSvc'),fChr=document.getElementById('cfgChr'),fEnc=document.getElementById('cfgEnc'),fWr=document.getElementById('cfgWrite');
+  var fApi=document.getElementById('cfgApi'),fSvc=document.getElementById('cfgSvc'),fChr=document.getElementById('cfgChr'),fEnc=document.getElementById('cfgEnc'),fWr=document.getElementById('cfgWrite'),fGr=document.getElementById('cfgGrade');
   function open(){
     fApi.value=SD.cfg.api||'';fSvc.value=SD.cfg.svc||'';fChr.value=SD.cfg.chr||'';
-    fEnc.value=SD.cfg.enc||'cells';fWr.value=SD.cfg.write||'nores-20';
+    fEnc.value=SD.cfg.enc||'cells';fWr.value=SD.cfg.write||'nores-20';fGr.value=SD.cfg.grade||'g2';
     bg.classList.add('open');
   }
   function close(){bg.classList.remove('open');}
@@ -628,7 +1021,8 @@ var SD={
   bg.addEventListener('click',function(e){if(e.target===bg)close();});
   document.getElementById('cfgSave').addEventListener('click',function(){
     SD.cfg.api=fApi.value.trim();SD.cfg.svc=fSvc.value.trim().toLowerCase();SD.cfg.chr=fChr.value.trim().toLowerCase();
-    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.save();close();
+    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.save();close();
+    if(currentFeature)loadFeature(currentFeature,false);   // 등급 변경 즉시 반영
     logRow('<span class="key">[SETUP] 설정 저장됨</span>');
   });
 })();
@@ -737,10 +1131,10 @@ var BLE={
       return BLE.sdk.connectBleDevice(d);
     }).then(function(dev){
       if(!dev)throw new Error('SDK 연결 실패');
-      BLE.dev=dev;BLE.mode='sdk';BLE.connected=true;BLE.lastSent=null;
+      BLE.dev=dev;BLE.mode='sdk';BLE.connected=true;BLE.lastSent=null;BLE.lastTextHex=null;
       BLE.uiConnected('DOTPAD (SDK)');
       logRow('<span class="key">[BLE] DotPadSDK 연결됨 \u00B7 cell '+dev.numberCellColumns+'\u00D7'+dev.numberCellRows+' \u00B7 하드웨어 키 입력 활성</span>');
-      BLE.push(frameBuf);
+      BLE.push(frameBuf);BLE.pushText(textBuf);
     }).catch(function(e){
       logErr('BLE 연결 실패: '+e.message);BLE.onDisconnect();
     });
@@ -823,6 +1217,20 @@ var BLE={
     BLE.pendingBuf=buf;
     BLE.pump();
   },
+
+  lastTextHex:null,_textWarned:false,
+  pushText:function(tbuf){
+    if(!BLE.connected)return;
+    var hex=BLE.toHex(tbuf);
+    if(hex===BLE.lastTextHex)return;
+    BLE.lastTextHex=hex;
+    if(BLE.mode==='sdk'){
+      try{BLE.sdk.displayTextData(hex,BLE.dev);}catch(e){logErr('텍스트 라인 전송 오류: '+e.message);}
+    }else if(!BLE._textWarned){
+      BLE._textWarned=true;
+      logRow('<span class="key">[BLE] raw 폴백 모드에서는 텍스트 라인 전송이 지원되지 않습니다(SDK 필요)</span>');
+    }
+  },
   pump:function(){
     if(BLE.busy||!BLE.pendingBuf||!BLE.connected)return;
     var now=Date.now();
@@ -871,7 +1279,7 @@ document.getElementById('bleBtn').addEventListener('click',function(){
    · 패턴이 한 칸씩 밀림 → 셀 정렬(시작 인덱스) 문제                       */
 var SYNC={
   id:-1,name:'SYNC TEST',description:'시뮬레이터-실기기 정렬 검증 패턴',request:'(진단)',
-  tts_intro:'싱크 테스트 패턴입니다. 테두리 사각형, 좌상단에서 우하단으로 향하는 대각선, 좌상단 엘 마커, 중앙 원, 우상단 사각 점이 기기와 화면에서 동일해야 합니다.',
+  tts_intro:'싱크 테스트 패턴입니다. 테두리 사각형, 좌상단에서 우하단으로 향하는 대각선, 좌상단 엘 마커, 중앙 원, 우상단 사각 점, 그리고 텍스트 라인의 싱크 문구가 기기와 화면에서 동일해야 합니다.',
   code:[
 "dp.clear();",
 "dp.rect(0,0,60,40);",
@@ -879,7 +1287,7 @@ var SYNC={
 "dp.line(2,2,2,8);dp.line(2,8,8,8);",
 "dp.circle(30,20,6);",
 "dp.rect(55,2,3,3,{fill:true});",
-"dp.text('sync',12,33);"
+"dp.textLine('sync 0123456789');"
   ].join('\n')
 };
 document.getElementById('syncBtn').addEventListener('click',function(){
@@ -910,13 +1318,20 @@ document.getElementById('syncBtn').addEventListener('click',function(){
   });
 })();
 
-/* ═══════════ DEPLOY EDITION: QUICK CHIPS ═══════════ */
+/* ═══════════ DEPLOY EDITION: QUICK CHIPS — 내장 데모 즉시 로드(API 불필요) ═══════════ */
 (function(){
+  var builtin={'분기별 매출 막대 차트':DEMO,'주사위 굴리기':DICE,'현재 시각을 점자로':CLOCK,
+               '가위바위보 게임':RPS,'간단한 미로 게임':MAZE,'사인 곡선 그래프':SINE,'라이브 점자 자막':LIVE};
   var chips=document.querySelectorAll('#chips .chip');
   for(var i=0;i<chips.length;i++){(function(ch){
     ch.addEventListener('click',function(){
-      input.value=ch.textContent+(ch.textContent.indexOf('만들')>=0?'':' 기능 만들어줘');
-      input.focus();
+      var f=builtin[ch.textContent];
+      if(f){
+        loadFeature(f);contextFeature=f;
+        addMsg('ai','<span class="ftitle">\u25B8 '+escapeHtml(f.name)+'</span><div class="small">내장 데모 — API 연결 없이 동작. 수정하려면 자연어로 요청하세요.</div>');
+      }else{
+        input.value=ch.textContent+' 기능 만들어줘';input.focus();
+      }
     });
   })(chips[i]);}
 })();
