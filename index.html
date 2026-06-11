@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SUPER DOT</title>
+<meta name="description" content="자연어로 요청한 기능을 DotPad(60×40 촉각 디스플레이)에서 즉시 구현하는 현장 프로토타이핑 도구">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='black'/%3E%3Ccircle cx='11' cy='11' r='4' fill='white'/%3E%3Ccircle cx='21' cy='11' r='4' fill='white'/%3E%3Ccircle cx='11' cy='21' r='4' fill='white'/%3E%3Ccircle cx='21' cy='21' r='4' fill='white'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Doto:wght,ROND@100..900,0&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -151,8 +153,26 @@
   footer .flinks a:hover{color:var(--ink)}
   footer .copy{margin-left:auto;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--ink-dim)}
 
+  /* process strip */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line)}
+  @media(max-width:760px){.steps{grid-template-columns:1fr}}
+  .step{padding:28px 30px;border-right:1px solid var(--line)}
+  .step:last-child{border-right:none}
+  @media(max-width:760px){.step{border-right:none;border-bottom:1px solid var(--line)}.step:last-child{border-bottom:none}}
+  .step-n{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--ink-dim)}
+  .step-t{font-weight:700;font-size:19px;letter-spacing:.08em;text-transform:uppercase;margin:10px 0 8px}
+  .step p{color:var(--ink-soft);font-size:13px;line-height:1.65;letter-spacing:.01em}
+
+  /* quick request chips */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .chip{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;border:1px solid var(--line);background:transparent;color:var(--ink-soft);padding:6px 11px;cursor:pointer;border-radius:0;transition:all .15s}
+  .chip:hover{color:var(--ink);border-color:var(--ink)}
+
+  /* mic */
+  #micBtn.rec{color:#FF5A4D;border-color:#FF5A4D}
+
   /* Doto — dot-matrix display face for brand + section titles */
-  .wordmark, .hero h1, .section-title, footer .fwm{
+  .wordmark, .hero h1, .section-title, .step-t, footer .fwm{
     font-family:'Doto','Archivo',sans-serif;
     font-optical-sizing:auto;
     font-variation-settings:"ROND" 0;
@@ -190,9 +210,22 @@
   <div class="scrollcue">SCROLL &darr;</div>
 </header>
 
-<section class="section" id="build">
+<section class="section" id="process">
   <div class="section-head">
     <span class="section-num">01</span>
+    <span class="section-title">Process</span>
+    <span class="section-desc">사용자 테스트 사이클을 기다리지 않고, 고객 피드백이 그 자리에서 작동하는 기능이 됩니다.</span>
+  </div>
+  <div class="steps">
+    <div class="step"><div class="step-n">A</div><div class="step-t step-doto">Listen</div><p>고객이 원하는 기능을 자연어로 입력합니다 — 텍스트 또는 음성으로.</p></div>
+    <div class="step"><div class="step-n">B</div><div class="step-t step-doto">Generate</div><p>AI가 DotPad가 표현 가능한 범위 안에서만 기능을 즉시 구현합니다.</p></div>
+    <div class="step"><div class="step-n">C</div><div class="step-t step-doto">Touch</div><p>시뮬레이터와 실기기에 동시 출력되고, 닷패드 하드웨어 키로 직접 조작합니다.</p></div>
+  </div>
+</section>
+
+<section class="section" id="build">
+  <div class="section-head">
+    <span class="section-num">02</span>
     <span class="section-title">Feature Builder</span>
     <span class="section-desc">자연어 요청을 DotPad 런타임 코드로 변환합니다. 출력은 항상 60&times;40 이진 디스플레이가 표현 가능한 범위로 제한됩니다.</span>
   </div>
@@ -207,13 +240,22 @@
           <textarea id="input" placeholder="고객이 원하는 기능을 자연어로 입력...  (생성 후 같은 칸에서 수정 요청 가능: '막대를 더 두껍게')"></textarea>
           <div class="row">
             <button class="btn solid" id="genBtn">기능 생성</button>
+            <button class="btn" id="micBtn" title="음성으로 입력 (ko-KR)">MIC</button>
             <button class="btn" id="newBtn" title="현재 기능 맥락 초기화">새 맥락</button>
             <span class="hint" style="margin-left:auto">&#8984;/CTRL+ENTER</span>
+          </div>
+          <div class="chips" id="chips">
+            <button class="chip">분기별 매출 막대 차트</button>
+            <button class="chip">주사위 굴리기</button>
+            <button class="chip">현재 시각을 점자로</button>
+            <button class="chip">가위바위보 게임</button>
+            <button class="chip">간단한 미로 게임</button>
+            <button class="chip">사인 곡선 그래프</button>
           </div>
         </div>
       </div>
       <div class="block">
-        <div class="block-head"><span>FEATURE LIBRARY</span><button class="btn" id="exportBtn" style="padding:5px 12px;font-size:10px">EXPORT JSON</button></div>
+        <div class="block-head"><span>FEATURE LIBRARY</span><span style="display:flex;gap:8px"><button class="btn" id="importBtn" style="padding:5px 12px;font-size:10px">IMPORT</button><button class="btn" id="exportBtn" style="padding:5px 12px;font-size:10px">EXPORT</button></span></div>
         <div id="library"><div class="empty">데모 기능이 시뮬레이터에 로드됨</div></div>
       </div>
     </div>
@@ -236,8 +278,8 @@
         </div>
       </div>
       <div class="block" id="console">
-        <div class="block-head"><span>TTS &middot; EVENT CONSOLE</span></div>
-        <div id="ttsLog"></div>
+        <div class="block-head"><span>TTS &middot; EVENT CONSOLE</span><button class="btn" id="ttsBtn" style="padding:5px 12px;font-size:10px" title="음성 출력 켜기/끄기">TTS ON</button></div>
+        <div id="ttsLog" aria-live="polite"></div>
         <details id="codeBox" hidden><summary>VIEW RUNTIME CODE</summary><pre id="codeView"></pre></details>
       </div>
     </div>
@@ -247,7 +289,7 @@
 <footer>
   <span class="fwm">SUPER DOT</span>
   <div class="flinks"><a href="#build">BUILD</a><a href="#simulator">SIMULATOR</a><a href="#console">CONSOLE</a></div>
-  <span class="copy">DOT INC &middot; INTERNAL PROTOTYPE</span>
+  <span class="copy">DOT INC &middot; INTERNAL PROTOTYPE &middot; v1.2</span>
 </footer>
 
 <div class="modal-bg" id="modalBg">
@@ -422,7 +464,7 @@ function createDP(){
 var ttsLog=document.getElementById('ttsLog');
 function stamp(){return new Date().toTimeString().slice(0,8);}
 function logRow(html){var div=document.createElement('div');div.className='tts';div.innerHTML='<span class="t">'+stamp()+'</span>'+html;ttsLog.appendChild(div);ttsLog.scrollTop=ttsLog.scrollHeight;}
-function tts(text){logRow('<span class="spk">'+escapeHtml(text)+'</span>');try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(text);u.lang='ko-KR';u.rate=1.05;speechSynthesis.speak(u);}catch(e){}}
+function tts(text){logRow('<span class="spk">'+escapeHtml(text)+'</span>');if(window.SD&&SD.cfg.mute)return;try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(text);u.lang='ko-KR';u.rate=1.05;speechSynthesis.speak(u);}catch(e){}}
 function logKey(k){logRow('<span class="key">[KEY] '+k+'</span>');}
 function logErr(m){logRow('<span style="color:#ff8c82">'+escapeHtml(m)+'</span>');}
 function escapeHtml(s){return s.replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
@@ -432,6 +474,7 @@ var featureNameEl=document.getElementById('featureName'),codeBox=document.getEle
 function loadFeature(feature,speakIntro){
   if(speakIntro===undefined)speakIntro=true;
   if(currentDP)currentDP._destroy();
+  try{speechSynthesis.cancel();}catch(e){}
   frameBuf.fill(0);requestPaint();
   currentDP=createDP();currentFeature=feature;
   featureNameEl.textContent=feature.name||'\u2014';
@@ -472,28 +515,53 @@ var SYSTEM_PROMPT=[
 var input=document.getElementById('input'),genBtn=document.getElementById('genBtn'),newBtn=document.getElementById('newBtn'),chatLog=document.getElementById('chatLog'),contextFeature=null;
 function addMsg(cls,html){var d=document.createElement('div');d.className='msg '+cls;d.innerHTML=html;chatLog.appendChild(d);chatLog.scrollTop=chatLog.scrollHeight;return d;}
 
+function callClaude(userContent){
+  return fetch(SD.api(),{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:(SD.cfg.api?2000:1000),system:SYSTEM_PROMPT,messages:[{role:'user',content:userContent}]})})
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if(data.error)throw new Error(data.error.message||'API 오류');
+    var truncated=(data.stop_reason==='max_tokens');
+    var raw=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n').trim();
+    raw=raw.replace(/```json|```/g,'').trim();
+    var feature;
+    try{feature=JSON.parse(raw);}
+    catch(e){
+      var i=raw.indexOf('{'),j=raw.lastIndexOf('}');
+      if(i>=0&&j>i){try{feature=JSON.parse(raw.slice(i,j+1));}catch(e2){throw new Error(truncated?'코드가 길이 제한에 잘렸습니다':'응답 JSON 파싱 실패');}}
+      else throw new Error(truncated?'코드가 길이 제한에 잘렸습니다':'응답 JSON 파싱 실패');
+    }
+    if(!feature||!feature.code)throw new Error('응답에 code 필드가 없습니다');
+    return feature;
+  });
+}
 function generate(){
   var req=input.value.trim();if(!req)return;
   input.value='';addMsg('user',escapeHtml(req));
   genBtn.disabled=true;genBtn.innerHTML='<span class="spin"></span>생성 중';
-  var userContent=req;
-  if(contextFeature)userContent='[현재 로드된 기능: '+contextFeature.name+']\n'+contextFeature.code+'\n\n[사용자 요청] '+req;
-  fetch(SD.api(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:SYSTEM_PROMPT,messages:[{role:'user',content:userContent}]})})
-  .then(function(r){return r.json();})
-  .then(function(data){
-    if(data.error)throw new Error(data.error.message||'API 오류');
-    var raw=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n').trim();
-    raw=raw.replace(/```json|```/g,'').trim();
-    var feature;
-    try{feature=JSON.parse(raw);}catch(e){var s=raw.indexOf('{'),t=raw.lastIndexOf('}');if(s>=0&&t>s)feature=JSON.parse(raw.slice(s,t+1));else throw new Error('응답 JSON 파싱 실패');}
-    if(!feature.code)throw new Error('응답에 code 필드가 없습니다');
-    feature.request=req;feature.id=Date.now();
-    var ok=loadFeature(feature);
-    if(ok){contextFeature=feature;library=library.filter(function(f){return f.id!==feature.id;});library.unshift(feature);renderLibrary();addMsg('ai','<span class="ftitle">\u2713 '+escapeHtml(feature.name)+'</span><div class="small">'+escapeHtml(feature.description||'')+'</div><div class="small">시뮬레이터에 로드됨 — 같은 칸에서 수정 요청 가능</div>');}
-    else{addMsg('err','코드는 생성됐지만 실행 중 오류가 발생했습니다. 콘솔을 확인하고 수정을 요청해 보세요.');contextFeature=feature;}
-  })
-  .catch(function(e){addMsg('err','생성 실패: '+escapeHtml(e.message)+'<div class="small">GitHub Pages 등 배포 환경에서는 상단 SETUP에서 프록시 API 엔드포인트를 설정해야 합니다. 요청을 더 짧고 구체적으로 바꿔보는 것도 도움이 됩니다.</div>');})
-  .then(function(){genBtn.disabled=false;genBtn.textContent='기능 생성';});
+  var base=req;
+  if(contextFeature)base='[현재 로드된 기능: '+contextFeature.name+']\n'+contextFeature.code+'\n\n[사용자 요청] '+req;
+  function attempt(content,retried){
+    return callClaude(content).then(function(feature){
+      feature.request=req;feature.id=Date.now();
+      if(!loadFeature(feature)){var err=new Error('생성된 코드 실행 오류');err.feature=feature;throw err;}
+      return feature;
+    }).catch(function(err){
+      if(!retried){
+        addMsg('ai','<span class="small">1차 시도 실패('+escapeHtml(err.message||'오류')+') — 더 단순한 버전으로 자동 재시도 중\u2026</span>');
+        var fix=content+'\n\n[시스템] 직전 시도가 실패했습니다: '+(err.message||'오류')+'. 기능을 더 단순화하고 훨씬 짧은 코드로, 유효한 JSON 하나만 출력하세요.';
+        return attempt(fix,true);
+      }
+      throw err;
+    });
+  }
+  attempt(base,false).then(function(feature){
+    contextFeature=feature;
+    library=library.filter(function(f){return f.id!==feature.id;});library.unshift(feature);renderLibrary();
+    addMsg('ai','<span class="ftitle">\u2713 '+escapeHtml(feature.name)+'</span><div class="small">'+escapeHtml(feature.description||'')+'</div><div class="small">시뮬레이터에 로드됨 — 같은 칸에서 수정 요청 가능</div>');
+  }).catch(function(e){
+    addMsg('err','생성 실패: '+escapeHtml(e.message||'오류')+'<div class="small">GitHub Pages 등 배포 환경에서는 상단 SETUP에서 프록시 API 엔드포인트를 설정해야 합니다. 요청을 더 짧고 구체적으로 바꿔보는 것도 도움이 됩니다.</div>');
+  }).then(function(){genBtn.disabled=false;genBtn.textContent='기능 생성';});
 }
 genBtn.addEventListener('click',generate);
 input.addEventListener('keydown',function(e){if((e.metaKey||e.ctrlKey)&&e.key==='Enter')generate();});
@@ -523,7 +591,21 @@ document.getElementById('exportBtn').addEventListener('click',function(){
 var DEMO={id:0,name:'DEMO: 분기 매출 차트',description:'4개 분기 막대그래프. F1로 탐색, 음성 안내.',request:'(내장 데모)',
 tts_intro:'분기별 매출 차트입니다. F1 키를 누르면 다음 분기로 이동하며 값을 읽어줍니다. 팬 키로 좌우 이동도 가능합니다.',
 code:["dp.clear();","var data=[['q1',32],['q2',45],['q3',28],['q4',51]];","var base=32,bw=8,gap=5;","dp.line(4,base,57,base);dp.line(4,base+1,57,base+1);","for(var i=0;i<4;i++){var h=Math.round(data[i][1]/60*26);dp.rect(8+i*(bw+gap),base-h,bw,h,{fill:true});}","dp.text('q1',9,35);dp.text('q2',22,35);dp.text('q3',35,35);dp.text('q4',48,35);","dp.state.i=-1;","function read(i){dp.speak((i+1)+'분기 매출 '+data[i][1]+'억 원');}","dp.onKey(function(k){"," if(k==='F1'||k==='PAN_RIGHT'){dp.state.i=(dp.state.i+1)%4;read(dp.state.i);}"," else if(k==='PAN_LEFT'){dp.state.i=(dp.state.i+3)%4;read(dp.state.i);}"," else if(k==='F2'&&dp.state.i>=0){read(dp.state.i);}","});"].join('\n')};
-library.push(DEMO);loadFeature(DEMO,false);renderLibrary();
+var DICE={id:2,name:'DEMO: 주사위',description:'F1로 주사위 굴리기. 애니메이션 후 결과 음성 안내.',request:'(내장 데모)',
+tts_intro:'주사위 기능입니다. F1 키를 누르면 주사위를 굴리고 결과를 읽어줍니다.',
+code:["var P={1:[[1,1]],2:[[0,0],[2,2]],3:[[0,0],[1,1],[2,2]],4:[[0,0],[2,0],[0,2],[2,2]],5:[[0,0],[2,0],[1,1],[0,2],[2,2]],6:[[0,0],[2,0],[0,1],[2,1],[0,2],[2,2]]};",
+"function face(n){dp.clear();dp.rect(17,2,26,26);dp.rect(18,3,24,24);P[n].forEach(function(p){dp.rect(21+p[0]*8,6+p[1]*8,3,3,{fill:true});});dp.text('dice',24,31);}",
+"dp.state.busy=false;face(1);",
+"dp.onKey(function(k){if(k==='F1'&&!dp.state.busy){dp.state.busy=true;var n=1+Math.floor(Math.random()*6),i=0;",
+"var t=dp.interval(90,function(){face(1+Math.floor(Math.random()*6));if(++i>5){clearInterval(t);face(n);dp.state.busy=false;dp.speak('주사위 결과 '+n);}});}});"].join('\n')};
+var CLOCK={id:3,name:'DEMO: 점자 시계',description:'현재 시각을 점자로 표시. F1로 음성 안내, 자동 갱신.',request:'(내장 데모)',
+tts_intro:'점자 시계입니다. 화면에 현재 시각이 점자로 표시되며, F1 키를 누르면 시각을 읽어줍니다.',
+code:["function draw(){var d=new Date(),h=('0'+d.getHours()).slice(-2),m=('0'+d.getMinutes()).slice(-2);",
+"dp.clear();dp.rect(0,0,60,40);dp.rect(1,1,58,38);dp.text(h+':'+m,12,14);dp.text('clock',15,28);}",
+"draw();dp.interval(15000,draw);",
+"dp.onKey(function(k){if(k==='F1'){var d=new Date();dp.speak('현재 시각 '+d.getHours()+'시 '+d.getMinutes()+'분');}});"].join('\n')};
+library.push(DEMO);library.push(DICE);library.push(CLOCK);
+loadFeature(DEMO,false);renderLibrary();
 
 /* ═══════════ DEPLOY EDITION: SETTINGS ═══════════ */
 var SD={
@@ -803,6 +885,71 @@ var SYNC={
 document.getElementById('syncBtn').addEventListener('click',function(){
   loadFeature(SYNC);
 });
+
+/* ═══════════ DEPLOY EDITION: VOICE INPUT ═══════════ */
+(function(){
+  var micBtn=document.getElementById('micBtn');
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){
+    micBtn.addEventListener('click',function(){logErr('이 브라우저는 음성 인식을 지원하지 않습니다. Chrome에서 열어주세요.');});
+    return;
+  }
+  var rec=null,listening=false;
+  micBtn.addEventListener('click',function(){
+    if(listening){try{rec.stop();}catch(e){}return;}
+    rec=new SR();rec.lang='ko-KR';rec.interimResults=false;rec.maxAlternatives=1;
+    rec.onstart=function(){listening=true;micBtn.textContent='REC \u25CF';micBtn.classList.add('rec');};
+    rec.onresult=function(e){
+      var t=e.results[0][0].transcript;
+      input.value=(input.value?input.value+' ':'')+t;
+      input.focus();
+    };
+    rec.onerror=function(e){logErr('음성 인식 오류: '+e.error);};
+    rec.onend=function(){listening=false;micBtn.textContent='MIC';micBtn.classList.remove('rec');};
+    try{rec.start();}catch(e){logErr('음성 인식 시작 실패: '+e.message);}
+  });
+})();
+
+/* ═══════════ DEPLOY EDITION: QUICK CHIPS ═══════════ */
+(function(){
+  var chips=document.querySelectorAll('#chips .chip');
+  for(var i=0;i<chips.length;i++){(function(ch){
+    ch.addEventListener('click',function(){
+      input.value=ch.textContent+(ch.textContent.indexOf('만들')>=0?'':' 기능 만들어줘');
+      input.focus();
+    });
+  })(chips[i]);}
+})();
+
+/* ═══════════ DEPLOY EDITION: LIBRARY IMPORT ═══════════ */
+document.getElementById('importBtn').addEventListener('click',function(){
+  var raw=prompt('EXPORT로 복사했던 라이브러리 JSON을 붙여넣으세요:');
+  if(!raw)return;
+  try{
+    var arr=JSON.parse(raw);
+    if(!Array.isArray(arr))throw new Error('배열이 아닙니다');
+    var added=0;
+    arr.forEach(function(f){
+      if(!f||!f.code)return;
+      if(library.some(function(x){return x.id===f.id;}))return;
+      library.push(f);added++;
+    });
+    renderLibrary();
+    addMsg('ai','라이브러리에 '+added+'개 기능을 가져왔습니다.');
+  }catch(e){logErr('가져오기 실패: '+e.message);}
+});
+
+/* ═══════════ DEPLOY EDITION: TTS MUTE TOGGLE ═══════════ */
+(function(){
+  var btn=document.getElementById('ttsBtn');
+  function render(){btn.textContent=SD.cfg.mute?'TTS OFF':'TTS ON';}
+  btn.addEventListener('click',function(){
+    SD.cfg.mute=!SD.cfg.mute;SD.save();render();
+    if(SD.cfg.mute){try{speechSynthesis.cancel();}catch(e){}}
+    logRow('<span class="key">[TTS] '+(SD.cfg.mute?'음소거':'음성 출력 켜짐')+'</span>');
+  });
+  render();
+})();
 
 </script>
 </body>
