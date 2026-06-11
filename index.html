@@ -290,7 +290,7 @@
 <footer>
   <span class="fwm">SUPER DOT</span>
   <div class="flinks"><a href="#build">BUILD</a><a href="#simulator">SIMULATOR</a><a href="#console">CONSOLE</a></div>
-  <span class="copy">DOT INC &middot; INTERNAL PROTOTYPE &middot; v1.2</span>
+  <span class="copy">DOT INC &middot; INTERNAL PROTOTYPE &middot; v1.3</span>
 </footer>
 
 <div class="modal-bg" id="modalBg">
@@ -987,11 +987,16 @@ code:["var PER=20,LINES=8,GAPY=5,POS={1:[0,0],2:[0,1],3:[0,2],4:[1,0],5:[1,1],6:
 "  for(var d=0;d<dots.length;d++){var p=POS[dots[d]];dp.set(x+p[0],y+p[1]);}",
 " }",
 "}",
+"dp.state._rt=0;",
+"function requestRender(){",
+" if(dp.state._rt)return;",
+" dp.state._rt=dp.timeout(120,function(){dp.state._rt=0;render();});",
+"}",
 "dp.textLine('live caption');render();",
 "dp.listen(function(t,fin){",
 " if(!dp.state.on)return;",
 " if(fin){dp.state.txt+=t+' ';dp.state.tmp='';}else{dp.state.tmp=t;}",
-" render();",
+" requestRender();",
 "});",
 "dp.onKey(function(k){",
 " if(k==='F1'){dp.state.txt='';dp.state.tmp='';render();dp.speak('자막을 지웠습니다');}",
@@ -1125,6 +1130,7 @@ var BLE={
   sdkConnect:function(m){
     BLE.sdk=BLE.sdk||new m.DotPadSDK();
     BLE.scanner=BLE.scanner||new m.DotPadScanner();
+    BLE.DM=m.DisplayMode;BLE.ready=false;
     BLE.sdk.setCallBack(BLE.onMessage,BLE.onKey);
     BLE.scanner.startBleScan().then(function(d){
       if(!d)throw new Error('기기를 선택하지 않았습니다');
@@ -1134,7 +1140,7 @@ var BLE={
       BLE.dev=dev;BLE.mode='sdk';BLE.connected=true;BLE.lastSent=null;BLE.lastTextHex=null;
       BLE.uiConnected('DOTPAD (SDK)');
       logRow('<span class="key">[BLE] DotPadSDK 연결됨 \u00B7 cell '+dev.numberCellColumns+'\u00D7'+dev.numberCellRows+' \u00B7 하드웨어 키 입력 활성</span>');
-      BLE.push(frameBuf);BLE.pushText(textBuf);
+      if(BLE.ready){BLE.push(frameBuf);BLE.pushText(textBuf);}   // Connected가 먼저 도착한 경우
     }).catch(function(e){
       logErr('BLE 연결 실패: '+e.message);BLE.onDisconnect();
     });
@@ -1189,6 +1195,7 @@ var BLE={
   },
 
   onDisconnect:function(){
+    BLE.ready=false;
     BLE.connected=false;BLE.mode=null;BLE.dev=null;BLE.chr=null;BLE.pendingBuf=null;BLE.busy=false;
     var btn=document.getElementById('bleBtn');
     btn.textContent='BLE CONNECT';btn.className='navbtn';
@@ -1197,7 +1204,13 @@ var BLE={
 
   /* ---------- SDK callbacks ---------- */
   onMessage:function(device,code,msg){
-    if(code==='Disconnected'){logRow('<span class="key">[BLE] 연결 해제됨</span>');BLE.onDisconnect();}
+    if(code==='Connected'){
+      // 보드 정보 수신 완료 — 이 시점부터 그래픽/텍스트 라인 전송이 유효
+      BLE.ready=true;BLE.lastSent=null;BLE.lastTextHex=null;
+      logRow('<span class="key">[BLE] 디바이스 준비 완료(BoardInfo) \u00B7 출력 동기화</span>');
+      if(BLE.connected){BLE.push(frameBuf);BLE.pushText(textBuf);}
+    }
+    else if(code==='Disconnected'){logRow('<span class="key">[BLE] 연결 해제됨</span>');BLE.onDisconnect();}
     else if(code==='ConnectedFail'){logErr('BLE 연결 실패: '+msg);BLE.onDisconnect();}
     else if(code==='CommandError'){logErr('DotPad 명령 오류: '+msg);}
   },
@@ -1218,13 +1231,14 @@ var BLE={
     BLE.pump();
   },
 
-  lastTextHex:null,_textWarned:false,
+  lastTextHex:null,_textWarned:false,ready:false,
   pushText:function(tbuf){
     if(!BLE.connected)return;
-    var hex=BLE.toHex(tbuf);
-    if(hex===BLE.lastTextHex)return;
-    BLE.lastTextHex=hex;
     if(BLE.mode==='sdk'){
+      if(!BLE.ready)return;                       // BoardInfo 전 — Connected 콜백이 재동기화함
+      var hex=BLE.toHex(tbuf);
+      if(hex===BLE.lastTextHex)return;
+      BLE.lastTextHex=hex;
       try{BLE.sdk.displayTextData(hex,BLE.dev);}catch(e){logErr('텍스트 라인 전송 오류: '+e.message);}
     }else if(!BLE._textWarned){
       BLE._textWarned=true;
@@ -1243,10 +1257,32 @@ var BLE={
       for(var i=0;i<300;i++)if(bytes[i]!==BLE.lastSent[i]){same=false;break;}
       if(same)return;
     }
+    var prev=BLE.lastSent;
     BLE.lastSent=bytes;BLE.last=now;
     if(BLE.mode==='sdk'){
+      if(!BLE.ready){BLE.lastSent=null;return;}   // BoardInfo 전 전송은 SDK가 무시 — Connected 후 재동기화
       try{
-        BLE.sdk.displayGraphicData(BLE.toHex(bytes),BLE.dev);   // SDK가 라인 분할·전송·ACK 처리
+        var ROWS=10,COLS=30;
+        var rowsOk=BLE.dev&&BLE.dev.numberCellRows===ROWS&&BLE.dev.numberCellColumns===COLS;
+        if(!prev||!rowsOk||!BLE.DM){
+          BLE.sdk.displayGraphicData(BLE.toHex(bytes),BLE.dev);          // 첫 프레임/비표준 셀: 전체 전송
+        }else{
+          var changed=[];
+          for(var r=0;r<ROWS;r++){
+            for(var c=r*COLS;c<(r+1)*COLS;c++){
+              if(bytes[c]!==prev[c]){changed.push(r);break;}
+            }
+          }
+          if(changed.length>=7){
+            BLE.sdk.displayGraphicData(BLE.toHex(bytes),BLE.dev);        // 대부분 변경 — 전체 전송
+          }else{
+            for(var k=0;k<changed.length;k++){                            // 변경 행만 LIVE 갱신
+              var rr=changed[k];
+              var rowHex=BLE.toHex(bytes.slice(rr*COLS,(rr+1)*COLS));
+              BLE.sdk.displayLineData(rr+1,0,rowHex,BLE.DM.GraphicMode,BLE.dev);
+            }
+          }
+        }
       }catch(e){logErr('BLE 전송 오류: '+e.message);}
       if(BLE.pendingBuf)setTimeout(BLE.pump,BLE.MIN_INTERVAL);
       return;
