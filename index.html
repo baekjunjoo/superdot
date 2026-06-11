@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SUPER DOT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Doto:wght,ROND@100..900,0&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#000;--panel:#0A0A0A;--panel-2:#0E0E0E;
+    --line:#2A2A2A;--line-soft:#1A1A1A;
+    --ink:#FFFFFF;--ink-soft:#9A9A9A;--ink-dim:#5E5E5E;
+    --ok:#46C46A;
+    --din:'Archivo',-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,"SF Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:var(--din);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+
+  nav{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;gap:26px;padding:20px 30px;transition:background .3s,border-color .3s;border-bottom:1px solid transparent}
+  nav.scrolled{background:rgba(0,0,0,.82);backdrop-filter:blur(8px);border-bottom-color:var(--line-soft)}
+  .wordmark{font-weight:700;font-size:18px;letter-spacing:.34em;text-transform:uppercase}
+  .navlinks{display:flex;gap:26px;margin-left:8px}
+  .navlinks a{font-size:11px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);transition:color .2s}
+  .navlinks a:hover{color:var(--ink)}
+  .navstatus{margin-left:auto;display:flex;gap:18px;align-items:center}
+  .navstatus span{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;color:var(--ink-dim);text-transform:uppercase}
+  .navstatus .live{color:var(--ok)}
+  .navstatus .live::before{content:"\25CF";margin-right:6px;font-size:8px;vertical-align:1px}
+  @media(max-width:760px){.navlinks{display:none}}
+
+  .hero{position:relative;height:100vh;min-height:600px;width:100%;overflow:hidden;display:flex;align-items:flex-end}
+  #hero{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,.15) 38%,rgba(0,0,0,.7) 100%);pointer-events:none}
+  .hero-inner{position:relative;z-index:2;padding:0 30px 64px;width:100%}
+  .eyebrow{font-size:12px;font-weight:600;letter-spacing:.28em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:18px}
+  .hero h1{font-weight:800;text-transform:uppercase;font-size:clamp(38px,7.5vw,96px);line-height:.92;letter-spacing:.02em}
+  .hero .sub{margin-top:22px;max-width:620px;font-size:14px;font-weight:400;letter-spacing:.04em;color:#D2D2D2;line-height:1.65}
+  .hero-cta{margin-top:30px;display:flex;gap:14px;flex-wrap:wrap}
+  .btn{font-family:var(--din);font-size:12px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;padding:13px 26px;border:1px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer;transition:all .18s;border-radius:0}
+  .btn:hover{background:var(--ink);color:#000}
+  .btn.solid{background:var(--ink);color:#000}
+  .btn.solid:hover{background:transparent;color:var(--ink)}
+  .btn:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+  .btn:disabled{opacity:.5;cursor:wait}
+  .scrollcue{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);z-index:3;font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--ink-soft);text-transform:uppercase;animation:bob 2.4s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,7px)}}
+  @media(prefers-reduced-motion:reduce){.scrollcue{animation:none}}
+
+  .section{border-top:1px solid var(--line)}
+  .section-head{padding:48px 30px 30px;display:flex;align-items:baseline;gap:18px;flex-wrap:wrap}
+  .section-num{font-family:var(--mono);font-size:12px;color:var(--ink-dim);letter-spacing:.1em}
+  .section-title{font-size:clamp(22px,3vw,34px);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+  .section-desc{flex:1;min-width:240px;text-align:right;color:var(--ink-soft);font-size:13px;letter-spacing:.02em;align-self:center}
+  @media(max-width:760px){.section-desc{text-align:left}}
+
+  .grid{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);border-top:1px solid var(--line)}
+  @media(max-width:980px){.grid{grid-template-columns:1fr}}
+  .col-left{border-right:1px solid var(--line)}
+  @media(max-width:980px){.col-left{border-right:none;border-bottom:1px solid var(--line)}}
+
+  .block{border-bottom:1px solid var(--line)}
+  .block:last-child{border-bottom:none}
+  .block-head{padding:14px 22px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);display:flex;align-items:center;justify-content:space-between}
+
+  #chatLog{padding:18px 22px;display:flex;flex-direction:column;gap:12px;max-height:360px;overflow-y:auto}
+  .msg{padding:11px 14px;font-size:13.5px;max-width:96%;border:1px solid var(--line);line-height:1.55}
+  .msg.user{background:var(--ink);color:#000;align-self:flex-end;border-color:var(--ink);font-weight:500}
+  .msg.ai{background:var(--panel-2);align-self:flex-start}
+  .msg.err{background:#1a0d0c;border-color:#5a201c;color:#ff8c82;align-self:flex-start}
+  .msg .small{font-size:11.5px;color:var(--ink-soft);margin-top:5px;letter-spacing:.02em}
+  .msg.user .small{color:#444}
+  .msg .ftitle{font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+
+  .inputArea{padding:18px 22px}
+  textarea{width:100%;resize:vertical;min-height:84px;background:#000;color:var(--ink);border:1px solid var(--line);border-radius:0;padding:12px 14px;font:inherit;font-size:13.5px;letter-spacing:.01em}
+  textarea::placeholder{color:var(--ink-dim)}
+  textarea:focus{outline:none;border-color:var(--ink)}
+  .row{display:flex;gap:10px;margin-top:12px;align-items:center}
+  .hint{font-size:11px;color:var(--ink-dim);letter-spacing:.08em;text-transform:uppercase;font-family:var(--mono)}
+
+  #library{padding:14px 22px;display:flex;flex-direction:column;gap:10px}
+  .libItem{display:flex;align-items:center;gap:12px;border:1px solid var(--line);padding:11px 14px;background:#000;transition:border-color .2s}
+  .libItem.active{border-color:var(--ink)}
+  .libItem .grow{flex:1;min-width:0}
+  .libItem .name{font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.04em}
+  .libItem .desc{font-size:11.5px;color:var(--ink-soft);letter-spacing:.01em;margin-top:2px}
+  .libItem button{padding:5px 11px;font-size:10px}
+  .empty{color:var(--ink-dim);font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-family:var(--mono);padding:6px 0}
+
+  .deviceWrap{padding:30px;display:flex;flex-direction:column;align-items:center;gap:18px;background:radial-gradient(120% 90% at 50% 0%,#0d0d0d 0%,#000 70%)}
+  .device{border:1px solid var(--line);background:#050505;padding:22px 22px 18px;max-width:100%}
+  .deviceHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .deviceHead .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.26em;color:var(--ink-dim)}
+  #featureName{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--ink-soft);text-transform:uppercase}
+  canvas#pad{display:block;max-width:100%;height:auto;background:#000;border:1px solid var(--line-soft)}
+
+  .keys{display:flex;gap:10px;margin-top:4px;justify-content:center;flex-wrap:wrap}
+  .hwkey{font-family:var(--mono);font-size:12px;font-weight:500;background:#0c0c0c;color:var(--ink);border:1px solid var(--line);border-radius:0;padding:11px 16px;min-width:56px;cursor:pointer;transition:all .12s;text-transform:uppercase;letter-spacing:.06em}
+  .hwkey:hover{background:var(--ink);color:#000}
+  .hwkey:active{transform:translateY(1px)}
+  .hwkey.pan{min-width:78px}
+  .keycap{display:block;font-size:8.5px;color:var(--ink-dim);margin-top:3px;letter-spacing:.1em}
+  .hwkey:hover .keycap{color:#444}
+
+  #ttsLog{padding:16px 22px;max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:7px}
+  .tts{font-size:12.5px;display:flex;gap:10px;align-items:baseline;font-family:var(--mono)}
+  .tts .t{font-size:10px;color:var(--ink-dim);flex-shrink:0}
+  .tts .spk{color:var(--ink)}
+  .tts .spk::before{content:"TTS \25B8 ";color:var(--ok);font-size:10px}
+  .tts .key{color:var(--ink-soft)}
+
+  details{padding:0 22px 18px}
+  details summary{cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);padding:10px 0}
+  details summary:hover{color:var(--ink-soft)}
+  pre{background:#080808;border:1px solid var(--line-soft);color:#cfcfcf;padding:14px;font-size:11.5px;overflow-x:auto;font-family:var(--mono);white-space:pre-wrap;word-break:break-all;line-height:1.6}
+
+  .spin{display:inline-block;width:11px;height:11px;border:2px solid #000;border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px;margin-right:8px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media(prefers-reduced-motion:reduce){.spin{animation:none}}
+
+  footer{border-top:1px solid var(--line);padding:34px 30px;display:flex;align-items:center;gap:26px;flex-wrap:wrap}
+  footer .fwm{font-weight:700;letter-spacing:.3em;text-transform:uppercase;font-size:13px}
+  footer .flinks{display:flex;gap:22px;flex-wrap:wrap}
+  footer .flinks a{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft)}
+  footer .flinks a:hover{color:var(--ink)}
+  footer .copy{margin-left:auto;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--ink-dim)}
+
+  /* Doto — dot-matrix display face for brand + section titles */
+  .wordmark, .hero h1, .section-title, footer .fwm{
+    font-family:'Doto','Archivo',sans-serif;
+    font-optical-sizing:auto;
+    font-variation-settings:"ROND" 0;
+  }
+</style>
+</head>
+<body>
+
+<nav id="nav">
+  <div class="wordmark">SUPER&nbsp;DOT</div>
+  <div class="navlinks">
+    <a href="#build">BUILD</a>
+    <a href="#simulator">SIMULATOR</a>
+    <a href="#console">CONSOLE</a>
+  </div>
+  <div class="navstatus">
+    <span>60 &times; 40 BINARY</span>
+    <span class="live">SIMULATOR</span>
+    <span>BLE &middot; DEPLOY</span>
+  </div>
+</nav>
+
+<header class="hero">
+  <canvas id="hero" aria-hidden="true"></canvas>
+  <div class="hero-inner">
+    <div class="eyebrow">NATURAL LANGUAGE &rarr; TACTILE FEATURE</div>
+    <h1>SUPER DOT</h1>
+    <p class="sub">현장에서 고객이 원하는 기능을 말로 입력하면, DotPad에서 작동 가능한 범위 안에서 즉시 기능이 구현됩니다. 사용자 테스트를 기다리지 않고 그 자리에서 시연하기 위한 도구입니다.</p>
+    <div class="hero-cta">
+      <a class="btn solid" href="#build">기능 생성하기</a>
+      <a class="btn" href="#simulator">시뮬레이터 보기</a>
+    </div>
+  </div>
+  <div class="scrollcue">SCROLL &darr;</div>
+</header>
+
+<section class="section" id="build">
+  <div class="section-head">
+    <span class="section-num">01</span>
+    <span class="section-title">Feature Builder</span>
+    <span class="section-desc">자연어 요청을 DotPad 런타임 코드로 변환합니다. 출력은 항상 60&times;40 이진 디스플레이가 표현 가능한 범위로 제한됩니다.</span>
+  </div>
+  <div class="grid">
+    <div class="col-left">
+      <div class="block">
+        <div class="block-head"><span>NATURAL LANGUAGE INPUT</span></div>
+        <div id="chatLog">
+          <div class="msg ai"><span class="ftitle">SUPER DOT</span><br>고객이 원하는 기능을 말로 입력하면 DotPad에서 바로 작동하는 기능을 생성합니다.<div class="small">예: "이번 분기 매출을 막대그래프로" &middot; "주사위 굴리기" &middot; "현재 시각을 점자로" &middot; "간단한 미로 게임"</div></div>
+        </div>
+        <div class="inputArea">
+          <textarea id="input" placeholder="고객이 원하는 기능을 자연어로 입력...  (생성 후 같은 칸에서 수정 요청 가능: '막대를 더 두껍게')"></textarea>
+          <div class="row">
+            <button class="btn solid" id="genBtn">기능 생성</button>
+            <button class="btn" id="newBtn" title="현재 기능 맥락 초기화">새 맥락</button>
+            <span class="hint" style="margin-left:auto">&#8984;/CTRL+ENTER</span>
+          </div>
+        </div>
+      </div>
+      <div class="block">
+        <div class="block-head"><span>FEATURE LIBRARY</span><button class="btn" id="exportBtn" style="padding:5px 12px;font-size:10px">EXPORT JSON</button></div>
+        <div id="library"><div class="empty">데모 기능이 시뮬레이터에 로드됨</div></div>
+      </div>
+    </div>
+    <div class="col-right">
+      <div class="block" id="simulator">
+        <div class="block-head"><span>DOT PAD SIMULATOR &mdash; 60 &times; 40</span></div>
+        <div class="deviceWrap">
+          <div class="device">
+            <div class="deviceHead"><span class="lbl">DOT PAD</span><span id="featureName">&mdash;</span></div>
+            <canvas id="pad" width="672" height="452" aria-label="DotPad 60x40 시뮬레이터"></canvas>
+          </div>
+          <div class="keys">
+            <button class="hwkey pan" data-key="PAN_LEFT">&#9664; PAN<span class="keycap">&larr; KEY</span></button>
+            <button class="hwkey" data-key="F1">F1<span class="keycap">KEY 1</span></button>
+            <button class="hwkey" data-key="F2">F2<span class="keycap">KEY 2</span></button>
+            <button class="hwkey" data-key="F3">F3<span class="keycap">KEY 3</span></button>
+            <button class="hwkey" data-key="F4">F4<span class="keycap">KEY 4</span></button>
+            <button class="hwkey pan" data-key="PAN_RIGHT">PAN &#9654;<span class="keycap">&rarr; KEY</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="block" id="console">
+        <div class="block-head"><span>TTS &middot; EVENT CONSOLE</span></div>
+        <div id="ttsLog"></div>
+        <details id="codeBox" hidden><summary>VIEW RUNTIME CODE</summary><pre id="codeView"></pre></details>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span class="fwm">SUPER DOT</span>
+  <div class="flinks"><a href="#build">BUILD</a><a href="#simulator">SIMULATOR</a><a href="#console">CONSOLE</a></div>
+  <span class="copy">DOT INC &middot; INTERNAL PROTOTYPE</span>
+</footer>
+
+<script>
+/* HERO PIN-FIELD */
+(function(){
+  var c=document.getElementById('hero'),x=c.getContext('2d');
+  var reduce=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  var w,h,sp,DPR,cx,cy,maxR,dots=[];
+
+  // angular color palette around the ring (warm top -> cool bottom), rotated over time
+  var STOPS=[
+    [220,120, 80],   // top    — warm orange
+    [108,150,206],   // right  — cool blue
+    [150,160,216],   // bottom — blue-lavender
+    [240,234,228]    // left   — bright cream / near-white
+  ];
+  function palette(pos){           // pos 0..1 around the wheel
+    var n=STOPS.length, f=((pos%1)+1)%1*n, i=Math.floor(f), t=f-i;
+    var a=STOPS[i%n], b=STOPS[(i+1)%n];
+    return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+  }
+
+  function build(){
+    DPR=Math.min(devicePixelRatio||1,2);
+    w=c.clientWidth;h=c.clientHeight;
+    c.width=w*DPR;c.height=h*DPR;x.setTransform(DPR,0,0,DPR,0,0);
+    cx=w*0.5; cy=h*0.46;                          // ring center
+    var m=Math.min(w,h);
+    var r0=m*0.225;                               // peak ring radius
+    sp=Math.max(8,Math.round(r0/15));            // dot pitch (controls grain + ring spacing)
+    maxR=sp*0.46;                                 // peak dot size (slightly smaller)
+    var sigIn=r0*0.20;                            // crisp inner edge
+    var sigOut=r0*0.34;                           // softer outer dissolve
+    var rMin=Math.max(sp, r0-sigIn*2.6);
+    var rMax=r0+sigOut*2.6;
+    dots=[];
+    // arrange dots on concentric rings so each ring can orbit independently
+    for(var rr=rMin; rr<=rMax; rr+=sp){
+      var s=rr<r0?sigIn:sigOut;
+      var inten=Math.exp(-((rr-r0)*(rr-r0))/(2*s*s));
+      if(inten<0.04) continue;
+      var count=Math.max(6, Math.round(2*Math.PI*rr/sp));   // even spacing ~ sp around the ring
+      var off=(rr/sp)*0.6;                                  // stagger rings to avoid radial spokes
+      // differential angular speed: inner rings orbit faster than outer -> "circles turning inside"
+      var spd=0.0011 + (rMax-rr)/rMax*0.0042;
+      for(var n=0;n<count;n++){
+        var baseA=off + n*(2*Math.PI/count);               // angle, 0 at top, clockwise
+        dots.push({rr:rr, a0:baseA, spd:spd, r:Math.sqrt(inten)*maxR, b:Math.pow(inten,0.8)});
+      }
+    }
+  }
+  build(); addEventListener('resize',build);
+
+  var t=0;
+  function draw(){
+    x.clearRect(0,0,w,h);
+    x.globalCompositeOperation='lighter';                  // additive -> overlapping dots glow
+    for(var k=0;k<dots.length;k++){
+      var dt=dots[k];
+      var ang=dt.a0 + dt.spd*t;                             // each ring rotates at its own rate
+      var px=cx + dt.rr*Math.sin(ang);                      // 0 at top, clockwise
+      var py=cy - dt.rr*Math.cos(ang);
+      var pos=(ang/(2*Math.PI));                            // color sampled at CURRENT position
+      var col=palette(pos);                                 // gradient stays fixed in space
+      var bf=dt.b;
+      var glowR=dt.r*3.0;                                  // bloom radius — wider soft spread
+      var core=0.09+bf*0.20;
+      var g=x.createRadialGradient(px,py,0,px,py,glowR);
+      g.addColorStop(0,'rgba('+(col[0]|0)+','+(col[1]|0)+','+(col[2]|0)+','+core.toFixed(3)+')');
+      g.addColorStop(0.45,'rgba('+(col[0]|0)+','+(col[1]|0)+','+(col[2]|0)+','+(core*0.35).toFixed(3)+')');
+      g.addColorStop(1,'rgba('+(col[0]|0)+','+(col[1]|0)+','+(col[2]|0)+',0)');
+      x.beginPath();x.arc(px,py,glowR,0,7);
+      x.fillStyle=g;
+      x.fill();
+    }
+    x.globalCompositeOperation='source-over';
+    if(!reduce) t+=1;
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+var navEl=document.getElementById('nav');
+addEventListener('scroll',function(){navEl.classList.toggle('scrolled',scrollY>30)},{passive:true});
+
+/* SIMULATOR RENDERER */
+var W=60,H=40,PITCH=11,PAD=6;
+var canvas=document.getElementById('pad'),ctx=canvas.getContext('2d');
+var DPR=Math.min(window.devicePixelRatio||1,2);
+canvas.width=(W*PITCH+PAD*2)*DPR;canvas.height=(H*PITCH+PAD*2)*DPR;canvas.style.width=(W*PITCH+PAD*2)+'px';ctx.scale(DPR,DPR);
+var frameBuf=new Uint8Array(W*H),rafQueued=false;
+function paint(){rafQueued=false;ctx.fillStyle='#000';ctx.fillRect(0,0,W*PITCH+PAD*2,H*PITCH+PAD*2);for(var y=0;y<H;y++)for(var x2=0;x2<W;x2++){var cx=PAD+x2*PITCH+PITCH/2,cy=PAD+y*PITCH+PITCH/2;if(frameBuf[y*W+x2]){ctx.beginPath();ctx.arc(cx,cy+0.6,4.4,0,7);ctx.fillStyle='rgba(0,0,0,.6)';ctx.fill();ctx.beginPath();ctx.arc(cx,cy,4.2,0,7);ctx.fillStyle='#F2F2F2';ctx.fill();ctx.beginPath();ctx.arc(cx-1.2,cy-1.2,1.5,0,7);ctx.fillStyle='#FFF';ctx.fill();}else{ctx.beginPath();ctx.arc(cx,cy,1.5,0,7);ctx.fillStyle='#2A2A2A';ctx.fill();}}}
+function requestPaint(){if(!rafQueued){rafQueued=true;requestAnimationFrame(paint);}}
+paint();
+
+/* BRAILLE */
+var BRAILLE={a:[1],b:[1,2],c:[1,4],d:[1,4,5],e:[1,5],f:[1,2,4],g:[1,2,4,5],h:[1,2,5],i:[2,4],j:[2,4,5],k:[1,3],l:[1,2,3],m:[1,3,4],n:[1,3,4,5],o:[1,3,5],p:[1,2,3,4],q:[1,2,3,4,5],r:[1,2,3,5],s:[2,3,4],t:[2,3,4,5],u:[1,3,6],v:[1,2,3,6],w:[2,4,5,6],x:[1,3,4,6],y:[1,3,4,5,6],z:[1,3,5,6],'.':[2,5,6],',':[2],'-':[3,6],':':[2,5],'?':[2,3,6],'!':[2,3,5],"'":[3],'/':[3,4],' ':[]};
+var NUMSIGN=[3,4,5,6],DIGITMAP={'1':'a','2':'b','3':'c','4':'d','5':'e','6':'f','7':'g','8':'h','9':'i','0':'j'};
+function drawCell(buf,dots,x,y){var pos={1:[0,0],2:[0,1],3:[0,2],4:[1,0],5:[1,1],6:[1,2]};for(var n=0;n<dots.length;n++){var p=pos[dots[n]],px=x+p[0],py=y+p[1];if(px>=0&&px<W&&py>=0&&py<H)buf[py*W+px]=1;}}
+
+/* dp RUNTIME */
+var currentDP=null;
+function createDP(){
+  var timers=[],keyHandler=null,dead=false;
+  var dp={W:W,H:H,state:{},
+    clear:function(){frameBuf.fill(0);requestPaint();},
+    set:function(x,y,v){v=v===undefined?1:v;x|=0;y|=0;if(x>=0&&x<W&&y>=0&&y<H){frameBuf[y*W+x]=v?1:0;requestPaint();}},
+    get:function(x,y){x|=0;y|=0;return(x>=0&&x<W&&y>=0&&y<H)?frameBuf[y*W+x]:0;},
+    line:function(x0,y0,x1,y1,v){v=v===undefined?1:v;x0|=0;y0|=0;x1|=0;y1|=0;var dx=Math.abs(x1-x0),dy=Math.abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1,err=dx-dy;while(true){dp.set(x0,y0,v);if(x0===x1&&y0===y1)break;var e2=2*err;if(e2>-dy){err-=dy;x0+=sx;}if(e2<dx){err+=dx;y0+=sy;}}},
+    rect:function(x,y,w,h,o){o=o||{};x|=0;y|=0;w|=0;h|=0;if(o.fill){for(var j=y;j<y+h;j++)for(var i=x;i<x+w;i++)dp.set(i,j,1);}else{dp.line(x,y,x+w-1,y);dp.line(x,y+h-1,x+w-1,y+h-1);dp.line(x,y,x,y+h-1);dp.line(x+w-1,y,x+w-1,y+h-1);}},
+    circle:function(cx,cy,r,o){o=o||{};cx|=0;cy|=0;r|=0;for(var y2=-r;y2<=r;y2++)for(var x2=-r;x2<=r;x2++){var d=Math.sqrt(x2*x2+y2*y2);if(o.fill?d<=r+0.3:Math.abs(d-r)<0.6)dp.set(cx+x2,cy+y2,1);}},
+    text:function(str,x,y){x|=0;y|=0;var numMode=false,s=String(str).toLowerCase();for(var k=0;k<s.length;k++){var ch=s[k];if(x+1>=W)break;if(DIGITMAP[ch]){if(!numMode){drawCell(frameBuf,NUMSIGN,x,y);x+=3;numMode=true;if(x+1>=W)break;}drawCell(frameBuf,BRAILLE[DIGITMAP[ch]],x,y);}else{numMode=false;drawCell(frameBuf,BRAILLE[ch]||[],x,y);}x+=3;}requestPaint();return x;},
+    speak:function(text){if(!dead)tts(String(text));},
+    onKey:function(fn){keyHandler=fn;},
+    interval:function(ms,fn){var id=setInterval(function(){if(!dead)fn();},ms);timers.push(id);return id;},
+    timeout:function(ms,fn){var id=setTimeout(function(){if(!dead)fn();},ms);timers.push(id);return id;},
+    _fireKey:function(k){if(keyHandler&&!dead){try{keyHandler(k);}catch(e){logErr('키 핸들러 오류: '+e.message);}}},
+    _destroy:function(){dead=true;timers.forEach(function(id){clearInterval(id);clearTimeout(id);});keyHandler=null;}
+  };
+  return dp;
+}
+
+/* TTS + CONSOLE */
+var ttsLog=document.getElementById('ttsLog');
+function stamp(){return new Date().toTimeString().slice(0,8);}
+function logRow(html){var div=document.createElement('div');div.className='tts';div.innerHTML='<span class="t">'+stamp()+'</span>'+html;ttsLog.appendChild(div);ttsLog.scrollTop=ttsLog.scrollHeight;}
+function tts(text){logRow('<span class="spk">'+escapeHtml(text)+'</span>');try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(text);u.lang='ko-KR';u.rate=1.05;speechSynthesis.speak(u);}catch(e){}}
+function logKey(k){logRow('<span class="key">[KEY] '+k+'</span>');}
+function logErr(m){logRow('<span style="color:#ff8c82">'+escapeHtml(m)+'</span>');}
+function escapeHtml(s){return s.replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+
+/* FEATURE LOADER */
+var featureNameEl=document.getElementById('featureName'),codeBox=document.getElementById('codeBox'),codeView=document.getElementById('codeView'),currentFeature=null;
+function loadFeature(feature,speakIntro){
+  if(speakIntro===undefined)speakIntro=true;
+  if(currentDP)currentDP._destroy();
+  frameBuf.fill(0);requestPaint();
+  currentDP=createDP();currentFeature=feature;
+  featureNameEl.textContent=feature.name||'\u2014';
+  codeView.textContent=feature.code;codeBox.hidden=false;
+  try{var fn=new Function('dp',feature.code);fn(currentDP);if(speakIntro&&feature.tts_intro)tts(feature.tts_intro);renderLibrary();return true;}
+  catch(e){logErr('기능 실행 오류: '+e.message);return false;}
+}
+
+/* KEYS */
+var hwkeys=document.querySelectorAll('.hwkey');
+for(var hk=0;hk<hwkeys.length;hk++){(function(btn){btn.addEventListener('click',function(){var k=btn.dataset.key;logKey(k);if(currentDP)currentDP._fireKey(k);});})(hwkeys[hk]);}
+document.addEventListener('keydown',function(e){
+  if(e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT')return;
+  var map={'1':'F1','2':'F2','3':'F3','4':'F4','ArrowLeft':'PAN_LEFT','ArrowRight':'PAN_RIGHT'},k=map[e.key];
+  if(k){e.preventDefault();logKey(k);if(currentDP)currentDP._fireKey(k);}
+});
+
+/* CLAUDE API */
+var SYSTEM_PROMPT=[
+'당신은 Super Dot의 기능 생성 엔진입니다. Dot Pad는 시각장애인용 60x40 이진(켜짐/꺼짐) 촉각 점자 디스플레이입니다. 회색조 없음.',
+'사용자의 자연어 요청을 받아 Dot Pad에서 작동하는 기능을 JavaScript로 즉시 구현합니다.',
+'',
+'반드시 아래 형식의 JSON 하나만 출력하세요. 마크다운 코드펜스, 설명문 절대 금지.',
+'{"name":"기능명(짧게)","description":"한 줄 설명","tts_intro":"기능 로드 시 음성 안내. 사용 가능한 키 조작법을 반드시 포함(한국어)","code":"자바스크립트 코드"}',
+'',
+'code 작성 규칙:',
+'- 제공되는 dp 객체만 사용. 코드는 최상위에서 1회 실행됨. DOM/window/fetch 접근 금지.',
+'- API: dp.W(=60), dp.H(=40), dp.clear(), dp.set(x,y,v), dp.get(x,y), dp.line(x0,y0,x1,y1), dp.rect(x,y,w,h,{fill:true}), dp.circle(cx,cy,r,{fill:true}), dp.text(str,x,y) — 영문/숫자만 점자 출력(글자당 가로3칸 세로4칸), dp.speak(텍스트) — 한국어 TTS, dp.onKey(fn) — fn(key)로 키 수신(key 값: "F1","F2","F3","F4","PAN_LEFT","PAN_RIGHT"), dp.interval(ms,fn), dp.timeout(ms,fn), dp.state.',
+'- 렌더링은 자동. flush 불필요.',
+'- 촉각 우선: 선은 가급적 굵게, 요소 간 간격 충분히, 과밀 금지.',
+'- 모든 키 상호작용에 dp.speak로 음성 피드백 필수 (시각장애인이 유일하게 받는 피드백).',
+'- 한국어 텍스트는 화면에 그리지 말고 dp.speak로 전달. 화면 라벨은 영문/숫자 점자만.',
+'- 코드는 압축적으로, 주석 없이. JSON 문자열 안이므로 이스케이프 유의.',
+'',
+'[현재 로드된 기능] 블록이 주어지면: 수정 요청이면 전체 코드를 수정해 다시 출력, 새 기능 요청이면 새로 작성.'
+].join('\n');
+
+var input=document.getElementById('input'),genBtn=document.getElementById('genBtn'),newBtn=document.getElementById('newBtn'),chatLog=document.getElementById('chatLog'),contextFeature=null;
+function addMsg(cls,html){var d=document.createElement('div');d.className='msg '+cls;d.innerHTML=html;chatLog.appendChild(d);chatLog.scrollTop=chatLog.scrollHeight;return d;}
+
+function generate(){
+  var req=input.value.trim();if(!req)return;
+  input.value='';addMsg('user',escapeHtml(req));
+  genBtn.disabled=true;genBtn.innerHTML='<span class="spin"></span>생성 중';
+  var userContent=req;
+  if(contextFeature)userContent='[현재 로드된 기능: '+contextFeature.name+']\n'+contextFeature.code+'\n\n[사용자 요청] '+req;
+  fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:SYSTEM_PROMPT,messages:[{role:'user',content:userContent}]})})
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if(data.error)throw new Error(data.error.message||'API 오류');
+    var raw=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n').trim();
+    raw=raw.replace(/```json|```/g,'').trim();
+    var feature;
+    try{feature=JSON.parse(raw);}catch(e){var s=raw.indexOf('{'),t=raw.lastIndexOf('}');if(s>=0&&t>s)feature=JSON.parse(raw.slice(s,t+1));else throw new Error('응답 JSON 파싱 실패');}
+    if(!feature.code)throw new Error('응답에 code 필드가 없습니다');
+    feature.request=req;feature.id=Date.now();
+    var ok=loadFeature(feature);
+    if(ok){contextFeature=feature;library=library.filter(function(f){return f.id!==feature.id;});library.unshift(feature);renderLibrary();addMsg('ai','<span class="ftitle">\u2713 '+escapeHtml(feature.name)+'</span><div class="small">'+escapeHtml(feature.description||'')+'</div><div class="small">시뮬레이터에 로드됨 — 같은 칸에서 수정 요청 가능</div>');}
+    else{addMsg('err','코드는 생성됐지만 실행 중 오류가 발생했습니다. 콘솔을 확인하고 수정을 요청해 보세요.');contextFeature=feature;}
+  })
+  .catch(function(e){addMsg('err','생성 실패: '+escapeHtml(e.message)+'<div class="small">요청을 더 짧고 구체적으로 바꿔 다시 시도하세요.</div>');})
+  .then(function(){genBtn.disabled=false;genBtn.textContent='기능 생성';});
+}
+genBtn.addEventListener('click',generate);
+input.addEventListener('keydown',function(e){if((e.metaKey||e.ctrlKey)&&e.key==='Enter')generate();});
+newBtn.addEventListener('click',function(){contextFeature=null;addMsg('ai','맥락을 초기화했습니다. 새 기능을 요청하세요.');});
+
+/* LIBRARY */
+var library=[],libraryEl=document.getElementById('library');
+function renderLibrary(){
+  if(!library.length){libraryEl.innerHTML='<div class="empty">생성된 기능 없음</div>';return;}
+  libraryEl.innerHTML='';
+  library.forEach(function(f){
+    var item=document.createElement('div');
+    item.className='libItem'+(currentFeature&&currentFeature.id===f.id?' active':'');
+    item.innerHTML='<div class="grow"><div class="name">'+escapeHtml(f.name)+'</div><div class="desc">'+escapeHtml(f.description||'')+'</div></div>';
+    var loadB=document.createElement('button');loadB.className='btn';loadB.textContent='RUN';loadB.onclick=function(){loadFeature(f);contextFeature=f;};
+    var delB=document.createElement('button');delB.className='btn';delB.textContent='\u2715';delB.title='삭제';delB.onclick=function(){library=library.filter(function(x){return x.id!==f.id;});renderLibrary();};
+    item.appendChild(loadB);item.appendChild(delB);libraryEl.appendChild(item);
+  });
+}
+document.getElementById('exportBtn').addEventListener('click',function(){
+  var json=JSON.stringify(library,null,2);
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(json).then(function(){addMsg('ai','라이브러리 JSON 복사됨 ('+library.length+'개 기능).');}).catch(function(){codeView.textContent=json;codeBox.hidden=false;codeBox.open=true;addMsg('ai','클립보드 접근 실패 — 코드 보기에서 수동 복사하세요.');});}
+  else{codeView.textContent=json;codeBox.hidden=false;codeBox.open=true;addMsg('ai','코드 보기에서 수동 복사하세요.');}
+});
+
+/* DEMO */
+var DEMO={id:0,name:'DEMO: 분기 매출 차트',description:'4개 분기 막대그래프. F1로 탐색, 음성 안내.',request:'(내장 데모)',
+tts_intro:'분기별 매출 차트입니다. F1 키를 누르면 다음 분기로 이동하며 값을 읽어줍니다. 팬 키로 좌우 이동도 가능합니다.',
+code:["dp.clear();","var data=[['q1',32],['q2',45],['q3',28],['q4',51]];","var base=32,bw=8,gap=5;","dp.line(4,base,57,base);dp.line(4,base+1,57,base+1);","for(var i=0;i<4;i++){var h=Math.round(data[i][1]/60*26);dp.rect(8+i*(bw+gap),base-h,bw,h,{fill:true});}","dp.text('q1',9,35);dp.text('q2',22,35);dp.text('q3',35,35);dp.text('q4',48,35);","dp.state.i=-1;","function read(i){dp.speak((i+1)+'분기 매출 '+data[i][1]+'억 원');}","dp.onKey(function(k){"," if(k==='F1'||k==='PAN_RIGHT'){dp.state.i=(dp.state.i+1)%4;read(dp.state.i);}"," else if(k==='PAN_LEFT'){dp.state.i=(dp.state.i+3)%4;read(dp.state.i);}"," else if(k==='F2'&&dp.state.i>=0){read(dp.state.i);}","});"].join('\n')};
+library.push(DEMO);loadFeature(DEMO,false);renderLibrary();
+</script>
+</body>
+</html>
