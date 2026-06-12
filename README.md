@@ -1,6 +1,7 @@
 # Super Dot
 
 자연어로 입력한 기능을 DotPad(60×40 이진 촉각 디스플레이)에서 작동 가능한 범위 안에서 즉시 구현해주는 현장 프로토타이핑 도구.
+Super Dot은 "그것도 되나요?"를 그 자리에서 "이미 됩니다"로 바꾸는 도구
 
 라이브: https://baekjunjoo.github.io/superdot
 
