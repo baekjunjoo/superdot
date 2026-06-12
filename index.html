@@ -902,12 +902,19 @@ function refreshVoices(){
   try{
     var all=speechSynthesis.getVoices()||[];
     TTSV.list=all.filter(function(v){return /^ko/i.test(v.lang||'')||/korean|한국/i.test(v.name||'');});
-    TTSV.pick=null;
     var want=window.SD&&SD.cfg&&SD.cfg.voice;
-    if(want)for(var i=0;i<TTSV.list.length;i++)if(TTSV.list[i].name===want){TTSV.pick=TTSV.list[i];break;}
-    if(!TTSV.pick&&TTSV.list.length){
+    if(want){ // 사용자가 직접 고른 음성은 항상 우선
+      for(var i=0;i<TTSV.list.length;i++)if(TTSV.list[i].name===want){TTSV.pick=TTSV.list[i];return;}
+    }
+    // 한 번이라도 말한 음성은 세션 내내 고정 — voiceschanged로 더 좋은 음성이 늦게 추가돼도
+    // 데모 도중 목소리/음량이 갑자기 바뀌지 않도록 한다
+    if(TTSV.locked&&TTSV.pick){
+      for(var j=0;j<TTSV.list.length;j++)if(TTSV.list[j].name===TTSV.pick.name)return;
+    }
+    TTSV.pick=null;
+    if(TTSV.list.length){
       var best=TTSV.list[0];
-      for(var j=1;j<TTSV.list.length;j++)if(ttsScore(TTSV.list[j])>ttsScore(best))best=TTSV.list[j];
+      for(var k=1;k<TTSV.list.length;k++)if(ttsScore(TTSV.list[k])>ttsScore(best))best=TTSV.list[k];
       TTSV.pick=best;
     }
   }catch(e){}
@@ -919,9 +926,9 @@ function tts(text){
   try{
     speechSynthesis.cancel();
     var u=new SpeechSynthesisUtterance(text);
-    u.lang='ko-KR';u.rate=1.05;u.pitch=1;
+    u.lang='ko-KR';u.rate=1.05;u.pitch=1;u.volume=1;
     if(!TTSV.pick)refreshVoices();
-    if(TTSV.pick)u.voice=TTSV.pick;
+    if(TTSV.pick){u.voice=TTSV.pick;TTSV.locked=true;}
     speechSynthesis.speak(u);
   }catch(e){}
 }
@@ -1715,12 +1722,29 @@ var BLE={
   },
 
   onDisconnect:function(){
-    BLE.ready=false;
+    BLE.ready=false;BLE.stopKeepalive();
     BLE.connected=false;BLE.mode=null;BLE.dev=null;BLE.chr=null;BLE.pendingBuf=null;BLE.busy=false;
     var btn=document.getElementById('bleBtn');
     btn.textContent='BLE CONNECT';btn.className='navbtn';
     document.getElementById('modeBadge').textContent='SIMULATOR';
   },
+
+  /* SDK는 전송이 1.5초 멈추면 LIVE 리프레시(터치된 행 재구동 3회)를 예약한다.
+     setRefreshMode 호출은 그 타이머를 취소하므로, 마지막 프레임과 '동일한' 1행 데이터를
+     1초마다 displayLineData로 재호출하면 — 데이터가 같아 BLE 패킷은 전혀 나가지 않으면서 —
+     재구동 사이클이 영구 보류되어 핀 들락거림이 사라진다. */
+  _ka:null,
+  startKeepalive:function(){
+    BLE.stopKeepalive();
+    BLE._ka=setInterval(function(){
+      if(!BLE.connected||!BLE.ready||BLE.mode!=='sdk'||!BLE.lastSent||!BLE.DM)return;
+      try{
+        var COLS=30,rowHex=BLE.toHex(BLE.lastSent.slice(0,COLS));
+        BLE.sdk.displayLineData(1,0,rowHex,BLE.DM.GraphicMode,BLE.dev);
+      }catch(e){}
+    },1000);
+  },
+  stopKeepalive:function(){if(BLE._ka){clearInterval(BLE._ka);BLE._ka=null;}},
 
   /* ---------- SDK callbacks ---------- */
   onMessage:function(device,code,msg){
@@ -1729,6 +1753,7 @@ var BLE={
       BLE.ready=true;BLE.lastSent=null;BLE.lastTextHex=null;
       logRow('<span class="key">[BLE] 디바이스 준비 완료(BoardInfo) \u00B7 출력 동기화</span>');
       if(BLE.connected){BLE.push(frameBuf);BLE.pushText(textBuf);}
+      BLE.startKeepalive();
     }
     else if(code==='Disconnected'){logRow('<span class="key">[BLE] 연결 해제됨</span>');BLE.onDisconnect();}
     else if(code==='ConnectedFail'){logErr('BLE 연결 실패: '+msg);BLE.onDisconnect();}
@@ -1759,7 +1784,12 @@ var BLE={
       var hex=BLE.toHex(tbuf);
       if(hex===BLE.lastTextHex)return;
       BLE.lastTextHex=hex;
-      try{BLE.sdk.displayTextData(hex,BLE.dev);}catch(e){logErr('텍스트 라인 전송 오류: '+e.message);}
+      try{
+        // displayTextData 대신 line0 LIVE 전송: TEXT_DISPLAY 모드가 그래픽 LIVE와 섞여
+        // ALL_DISPLAY로 승격 → 0~3행 재구동 사이클(윗행 플러터)이 도는 것을 차단
+        if(BLE.DM)BLE.sdk.displayLineData(0,0,hex,BLE.DM.TextMode,BLE.dev);
+        else BLE.sdk.displayTextData(hex,BLE.dev);
+      }catch(e){logErr('텍스트 라인 전송 오류: '+e.message);}
     }else if(!BLE._textWarned){
       BLE._textWarned=true;
       logRow('<span class="key">[BLE] raw 폴백 모드에서는 텍스트 라인 전송이 지원되지 않습니다(SDK 필요)</span>');
@@ -1784,23 +1814,18 @@ var BLE={
       try{
         var ROWS=10,COLS=30;
         var rowsOk=BLE.dev&&BLE.dev.numberCellRows===ROWS&&BLE.dev.numberCellColumns===COLS;
-        if(!prev||!rowsOk||!BLE.DM){
-          BLE.sdk.displayGraphicData(BLE.toHex(bytes),BLE.dev);          // 첫 프레임/비표준 셀: 전체 전송
+        if(!rowsOk||!BLE.DM){
+          BLE.sdk.displayGraphicData(BLE.toHex(bytes),BLE.dev);          // 비표준 셀 구성 전용 폴백
         }else{
-          var changed=[];
+          // 항상 행 단위 LIVE 전송 (첫 프레임은 10행 전부).
+          // displayGraphicData는 GRAPHIC_DISPLAY 리프레시 사이클(1~3행 3회 → 4~10행 3회 재구동)을
+          // 걸어 윗행이 들락거리므로 사용하지 않는다.
           for(var r=0;r<ROWS;r++){
-            for(var c=r*COLS;c<(r+1)*COLS;c++){
-              if(bytes[c]!==prev[c]){changed.push(r);break;}
-            }
-          }
-          if(changed.length>=7){
-            BLE.sdk.displayGraphicData(BLE.toHex(bytes),BLE.dev);        // 대부분 변경 — 전체 전송
-          }else{
-            for(var k=0;k<changed.length;k++){                            // 변경 행만 LIVE 갱신
-              var rr=changed[k];
-              var rowHex=BLE.toHex(bytes.slice(rr*COLS,(rr+1)*COLS));
-              BLE.sdk.displayLineData(rr+1,0,rowHex,BLE.DM.GraphicMode,BLE.dev);
-            }
+            var diff=!prev;
+            if(prev)for(var c=r*COLS;c<(r+1)*COLS;c++){if(bytes[c]!==prev[c]){diff=true;break;}}
+            if(!diff)continue;
+            var rowHex=BLE.toHex(bytes.slice(r*COLS,(r+1)*COLS));
+            BLE.sdk.displayLineData(r+1,0,rowHex,BLE.DM.GraphicMode,BLE.dev);
           }
         }
       }catch(e){logErr('BLE 전송 오류: '+e.message);}
