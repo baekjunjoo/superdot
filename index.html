@@ -67,6 +67,7 @@
   .btn{font-family:var(--din);font-size:12px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;padding:13px 26px;border:1px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer;transition:all .18s;border-radius:0}
   .btn:hover{background:var(--ink);color:#000}
   .btn.solid{background:var(--ink);color:#000}
+  .actbtn{min-width:112px;flex:0 0 auto;padding:13px 0;text-align:center;white-space:nowrap}
   .btn.solid:hover{background:transparent;color:var(--ink)}
   .btn:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   .btn:disabled{opacity:.5;cursor:wait}
@@ -237,11 +238,11 @@
           <div class="msg ai"><span class="ftitle">SUPER DOT</span><br>고객이 원하는 기능을 말로 입력하면 DotPad에서 바로 작동하는 기능을 생성합니다.<div class="small">예: "이번 분기 매출을 막대그래프로" &middot; "주사위 굴리기" &middot; "현재 시각을 점자로" &middot; "간단한 미로 게임"</div></div>
         </div>
         <div class="inputArea">
-          <textarea id="input" placeholder="고객이 원하는 기능을 자연어로 입력...  (생성 후 같은 칸에서 수정 요청 가능: '막대를 더 두껍게')"></textarea>
+          <textarea id="input" aria-label="기능 요청 입력" placeholder="고객이 원하는 기능을 자연어로 입력...  (생성 후 같은 칸에서 수정 요청 가능: '막대를 더 두껍게')"></textarea>
           <div class="row">
-            <button class="btn solid" id="genBtn">기능 생성</button>
-            <button class="btn" id="micBtn" title="음성으로 입력 (ko-KR)">MIC</button>
-            <button class="btn" id="newBtn" title="현재 기능 맥락 초기화">새 맥락</button>
+            <button class="btn solid actbtn" id="genBtn">기능 생성</button>
+            <button class="btn actbtn" id="newBtn" title="현재 기능 맥락 초기화">새 맥락</button>
+            <button class="btn actbtn" id="micBtn" title="음성으로 입력 (ko-KR)">MIC</button>
             <span class="hint" style="margin-left:auto">&#8984;/CTRL+ENTER</span>
           </div>
           <div class="chips" id="chips">
@@ -294,7 +295,7 @@
 </footer>
 
 <div class="modal-bg" id="modalBg">
-  <div class="modal" role="dialog" aria-label="설정">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="설정">
     <h3>SETUP — API &amp; BLE<button id="modalClose" aria-label="닫기">&#10005;</button></h3>
     <div class="body">
       <div class="field">
@@ -848,6 +849,7 @@ function createDP(){
       if(dead)return false;
       var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
       if(!SR){tts('이 브라우저는 음성 인식을 지원하지 않습니다. 크롬에서 열어주세요.');return false;}
+      if(window.stopDictation)stopDictation();   // MIC 받아쓰기와 동시 실행 불가 — 충돌 방지
       dp.stopListen();
       recog=new SR();recog.lang='ko-KR';recog.continuous=true;recog.interimResults=true;
       recog.onresult=function(e){
@@ -1509,9 +1511,9 @@ var SD={
     fVoice.value=SD.cfg.voice||'';
   }
   document.getElementById('voiceTest').addEventListener('click',function(){
-    var prev=SD.cfg.voice;SD.cfg.voice=fVoice.value;refreshVoices();
+    var prev=SD.cfg.voice;SD.cfg.voice=fVoice.value;TTSV.locked=false;refreshVoices();
     tts('안녕하세요. 닷패드 음성 안내 테스트입니다.');
-    SD.cfg.voice=prev;refreshVoices();
+    SD.cfg.voice=prev;TTSV.locked=false;refreshVoices();
   });
   function llStatText(){
     if(LL.status==='ready')return 'Liblouis: 사용 중 (v'+LL.ver+') · 실패 단어는 내장 변환기로 자동 폴백';
@@ -1547,6 +1549,7 @@ var SD={
   document.getElementById('modalClose').addEventListener('click',close);
   document.getElementById('cfgCancel').addEventListener('click',close);
   bg.addEventListener('click',function(e){if(e.target===bg)close();});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&bg.classList.contains('open'))close();});
   document.getElementById('cfgSave').addEventListener('click',function(){
     SD.cfg.api=fApi.value.trim();SD.cfg.svc=fSvc.value.trim().toLowerCase();SD.cfg.chr=fChr.value.trim().toLowerCase();
     SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.cfg.engine=fEng.value;SD.cfg.voice=fVoice.value;refreshVoices();SD.save();close();
@@ -1884,17 +1887,23 @@ document.getElementById('syncBtn').addEventListener('click',function(){
     return;
   }
   var rec=null,listening=false;
+  window.stopDictation=function(){if(listening&&rec){try{rec.stop();}catch(e){}}};
+  micBtn.setAttribute('aria-pressed','false');
   micBtn.addEventListener('click',function(){
     if(listening){try{rec.stop();}catch(e){}return;}
+    // 라이브 자막 등 기능의 연속 인식과 동시 실행 불가 — 기능 쪽을 먼저 중지
+    if(window.currentDP&&currentDP.stopListen){
+      try{currentDP.stopListen();logRow('<span class="key">[MIC] 기능의 음성 인식을 중지하고 받아쓰기를 시작합니다</span>');}catch(e){}
+    }
     rec=new SR();rec.lang='ko-KR';rec.interimResults=false;rec.maxAlternatives=1;
-    rec.onstart=function(){listening=true;micBtn.textContent='REC \u25CF';micBtn.classList.add('rec');};
+    rec.onstart=function(){listening=true;micBtn.textContent='REC \u25CF';micBtn.classList.add('rec');micBtn.setAttribute('aria-pressed','true');};
     rec.onresult=function(e){
       var t=e.results[0][0].transcript;
       input.value=(input.value?input.value+' ':'')+t;
       input.focus();
     };
     rec.onerror=function(e){logErr('음성 인식 오류: '+e.error);};
-    rec.onend=function(){listening=false;micBtn.textContent='MIC';micBtn.classList.remove('rec');};
+    rec.onend=function(){listening=false;micBtn.textContent='MIC';micBtn.classList.remove('rec');micBtn.setAttribute('aria-pressed','false');};
     try{rec.start();}catch(e){logErr('음성 인식 시작 실패: '+e.message);}
   });
 })();
