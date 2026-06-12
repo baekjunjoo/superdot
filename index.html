@@ -338,6 +338,24 @@
           <option value="g1">기본형 — 자모/알파벳 풀어쓰기 (검수·디버그용)</option>
         </select>
       </div>
+      <div class="frow">
+        <div class="field">
+          <label>Braille Engine</label>
+          <select id="cfgEngine">
+            <option value="builtin">내장 변환기 — 기본 &middot; 오프라인 &middot; 즉시</option>
+            <option value="liblouis">Liblouis — 정밀 점역 &middot; liblouis/ 빌드 필요</option>
+          </select>
+          <div class="note" id="llStat">Liblouis: 미로드 (내장 변환기 사용 중)</div>
+        </div>
+        <div class="field">
+          <label>점역 테스트 — 내장 vs Liblouis &middot; 역점역</label>
+          <div style="display:flex;gap:6px">
+            <input id="brlIn" type="text" placeholder="예: 팠다 / 것이다 / working" spellcheck="false" style="flex:1">
+            <button class="btn" id="brlGo" type="button">변환</button>
+          </div>
+          <div class="note" id="brlOut" style="white-space:pre-wrap"></div>
+        </div>
+      </div>
       <div class="field">
         <div class="note">BLE는 저장소에 <span style="color:var(--ink-soft)">DotPadSDK-3.0.0.js</span>가 있으면 공식 SDK로 연결됩니다(스캔·패킷·ACK·하드웨어 키 자동 처리). 위 UUID/인코딩/쓰기 설정은 SDK 파일이 없을 때의 raw 폴백 전용입니다.</div>
       </div>
@@ -704,12 +722,85 @@ function brailleCells(str){
 }
 function encodeEnSeqG1(str){var out=[];for(var i=0;i<str.length;i++){var c=L[str[i]];if(c)out.push(c);}return out;}
 /* 문자열 -> 20셀 점자 바이트 배열 (한글/영문/숫자, dot1..8=bit0..7) */
-function strToTextCells(str){
-  var seq=brailleCells(str),cells=[];
+function seqToTextCells(seq){
+  var cells=[];
   for(var i=0;i<seq.length&&cells.length<20;i++)cells.push(dotsToByte(seq[i]));
   while(cells.length<20)cells.push(0);
   return cells;
 }
+function strToTextCells(str){return seqToTextCells(brailleCells(str));}
+
+/* ═══ LIBLOUIS 옵션 엔진 (정밀 점역 · 워커 비동기 · 실패 시 내장 폴백) ═══
+   liblouis/ 폴더에 build-no-tables-utf16.js(직접 빌드) + easy-api.js + tables/ 가 있을 때만 동작.
+   렌더는 항상 내장 변환기로 즉시 → liblouis 결과 도착 시 같은 대상만 업그레이드. */
+var LL={
+  status:'off', err:'', ver:'', api:null, cache:{}, pend:{}, _wait:null,
+  enabled:function(){return !!(window.SD&&SD.cfg.engine==='liblouis');},
+  dir:function(){return location.pathname.replace(/[^\/]*$/,'').slice(1)+'liblouis/';}, // easy-api가 origin+"/"를 붙이므로 선두 / 제거
+  table:function(str){
+    var g=(((window.SD&&SD.cfg.grade)||'g2')==='g1')?'g1':'g2';
+    return /[\uAC00-\uD7A3]/.test(String(str))?('unicode.dis,ko-'+g+'.ctb'):('unicode.dis,en-ueb-'+g+'.ctb');
+  },
+  toDots:function(ub){ // 유니코드 점자(U+2800+bits) -> dots 배열, bit i = dot i+1
+    var out=[];for(var i=0;i<ub.length;i++){var v=ub.charCodeAt(i)-0x2800;if(v<0||v>255)continue;var d=[];for(var b=0;b<8;b++)if(v&(1<<b))d.push(b+1);out.push(d);}return out;
+  },
+  load:function(cb){
+    cb=cb||function(){};
+    if(LL.status==='ready')return cb(true);
+    if(LL.status==='loading'){LL._wait.push(cb);return;}
+    LL.status='loading';LL._wait=[cb];LL.err='';LL.cache={};
+    function fail(msg){if(LL.status!=='loading')return;LL.status='error';LL.err=msg;LL.api=null;var w=LL._wait||[];LL._wait=null;for(var i=0;i<w.length;i++)w[i](false);try{console.warn('[liblouis] '+msg);}catch(e){}}
+    function ok(){if(LL.status!=='loading')return;LL.status='ready';var w=LL._wait||[];LL._wait=null;for(var i=0;i<w.length;i++)w[i](true);}
+    if(location.protocol==='file:')return fail('file:// 에서는 워커를 쓸 수 없습니다. http로 서빙하세요.');
+    var s=document.createElement('script');s.src='liblouis/easy-api.js';
+    s.onerror=function(){fail('liblouis/easy-api.js 로드 실패');};
+    s.onload=function(){
+      try{
+        if(!window.LiblouisEasyApiAsync)return fail('LiblouisEasyApiAsync를 찾을 수 없음');
+        LL.api=new LiblouisEasyApiAsync({capi:LL.dir()+'build-no-tables-utf16.js',easyapi:LL.dir()+'easy-api.js'});
+        LL.api.registerLogCallback(function(lv,msg){try{console.debug('[liblouis '+lv+'] '+msg);}catch(e){}});
+        LL.api.worker.addEventListener('error',function(){fail('워커 오류 — liblouis/build-no-tables-utf16.js 빌드 파일이 있는지 확인하세요(빌드가이드 참고)');});
+        var t=setTimeout(function(){fail('초기화 시간 초과 — 빌드 파일 누락 또는 손상 가능');},12000);
+        LL.api.enableOnDemandTableLoading(LL.dir()+'tables/');
+        LL.api.version(function(v){clearTimeout(t);LL.ver=String(v||'');ok();});
+      }catch(e){fail(e&&e.message||'초기화 오류');}
+    };
+    document.head.appendChild(s);
+  },
+  cellsFor:function(str,cb){ // 비동기 점역 -> dots 배열 | null(실패: 내장 유지)
+    if(LL.status!=='ready')return cb(null);
+    str=String(str);
+    var key=LL.table(str)+'|'+str;
+    if(LL.cache.hasOwnProperty(key))return cb(LL.cache[key]);
+    if(LL.pend[key]){LL.pend[key].push(cb);return;}
+    LL.pend[key]=[cb];
+    var done=false,t=setTimeout(function(){flush(null,true);},4000);
+    function flush(v,transient){
+      if(done)return;done=true;clearTimeout(t);
+      if(!transient)LL.cache[key]=v;
+      var q=LL.pend[key]||[];delete LL.pend[key];
+      for(var i=0;i<q.length;i++)q[i](v);
+    }
+    try{
+      LL.api.translateString(LL.table(str),str,function(ub){
+        if(typeof ub!=='string'||(str.length&&!ub.length))return flush(null); // 테이블 크래시 단어 -> 내장 폴백 (캐시)
+        flush(LL.toDots(ub));
+      });
+    }catch(e){flush(null);}
+  },
+  testPair:function(str,cb){ // 점역 테스트 패널용: {ub,dots,back} | null
+    if(LL.status!=='ready')return cb(null);
+    str=String(str);
+    try{
+      LL.api.translateString(LL.table(str),str,function(ub){
+        if(typeof ub!=='string')return cb(null);
+        LL.api.backTranslateString(LL.table(str),ub,function(back){
+          cb({ub:ub,dots:LL.toDots(ub),back:(typeof back==='string'?back:'(역점역 실패)')});
+        });
+      });
+    }catch(e){cb(null);}
+  }
+};
 
 /* dp RUNTIME */
 var currentDP=null;
@@ -726,10 +817,18 @@ function createDP(){
     brailleCells:function(str){return brailleCells(str);},
     textLine:function(str){
       if(dead)return;
-      var cells=strToTextCells(str);
+      dp._tseq=(dp._tseq||0)+1;var my=dp._tseq;
+      var cells=strToTextCells(str);               // 내장 변환 즉시 표시
       for(var i=0;i<20;i++)textBuf[i]=cells[i];
       requestPaint();
       if(window.BLE&&BLE.connected)BLE.pushText(textBuf);
+      if(window.LL&&LL.enabled())LL.cellsFor(str,function(seq){   // liblouis 도착 시 업그레이드
+        if(dead||my!==dp._tseq||!seq)return;
+        var c2=seqToTextCells(seq);
+        for(var j=0;j<20;j++)textBuf[j]=c2[j];
+        requestPaint();
+        if(window.BLE&&BLE.connected)BLE.pushText(textBuf);
+      });
     },
     clearText:function(){
       if(dead)return;
@@ -792,12 +891,19 @@ var featureNameEl=document.getElementById('featureName'),codeBox=document.getEle
 function drawBrailleBlock(dp,str,opts){          // 그래픽 영역 멀티라인 점자
   opts=opts||{};var per=opts.per||20,lines=opts.lines||8,gy=opts.gapY||5;
   var POS={1:[0,0],2:[0,1],3:[0,2],4:[1,0],5:[1,1],6:[1,2]};
-  var cells=dp.brailleCells(str),max=per*lines,off=0;
-  if(cells.length>max)off=Math.ceil((cells.length-max)/per)*per;
-  dp.clear();
-  for(var i=off;i<cells.length;i++){
-    var n=i-off,x=(n%per)*3,y=Math.floor(n/per)*gy,dots=cells[i];
-    for(var d=0;d<dots.length;d++){var p=POS[dots[d]];dp.set(x+p[0],y+p[1]);}
+  function paint(cells){
+    var max=per*lines,off=0;
+    if(cells.length>max)off=Math.ceil((cells.length-max)/per)*per;
+    dp.clear();
+    for(var i=off;i<cells.length;i++){
+      var n=i-off,x=(n%per)*3,y=Math.floor(n/per)*gy,dots=cells[i];
+      for(var d=0;d<dots.length;d++){var p=POS[dots[d]];if(p)dp.set(x+p[0],y+p[1]);}
+    }
+  }
+  paint(dp.brailleCells(str));                   // 내장 변환 즉시
+  if(window.LL&&LL.enabled()){                   // liblouis 도착 시 같은 화면일 때만 업그레이드
+    var d0=currentDP;
+    LL.cellsFor(str,function(seq){if(!seq||currentDP!==d0)return;paint(seq);});
   }
 }
 
@@ -1338,9 +1444,34 @@ var SD={
 (function(){
   var bg=document.getElementById('modalBg');
   var fApi=document.getElementById('cfgApi'),fSvc=document.getElementById('cfgSvc'),fChr=document.getElementById('cfgChr'),fEnc=document.getElementById('cfgEnc'),fWr=document.getElementById('cfgWrite'),fGr=document.getElementById('cfgGrade');
+  var fEng=document.getElementById('cfgEngine'),llStat=document.getElementById('llStat'),brlIn=document.getElementById('brlIn'),brlGo=document.getElementById('brlGo'),brlOut=document.getElementById('brlOut');
+  function llStatText(){
+    if(LL.status==='ready')return 'Liblouis: 사용 중 (v'+LL.ver+') · 실패 단어는 내장 변환기로 자동 폴백';
+    if(LL.status==='loading')return 'Liblouis: 로딩 중...';
+    if(LL.status==='error')return 'Liblouis: 오류 — '+LL.err;
+    return 'Liblouis: 미로드 (내장 변환기 사용 중)';
+  }
+  function updateLL(){llStat.textContent=llStatText();}
+  function dotsStr(seq){var o=[];for(var i=0;i<seq.length;i++)o.push(seq[i].length?seq[i].join(''):'0');return o.join('|');}
+  brlGo.addEventListener('click',function(){
+    var v=brlIn.value.trim();if(!v){brlOut.textContent='';return;}
+    var mine='내장:      '+dotsStr(brailleCells(v));
+    function show(extra){brlOut.textContent=mine+(extra?'\n'+extra:'');}
+    if(fEng.value!=='liblouis'){show('(Liblouis 비교는 엔진을 Liblouis로 선택 후)');return;}
+    show('Liblouis: 변환 중...');
+    LL.load(function(ok2){
+      updateLL();
+      if(!ok2)return show('Liblouis: 로드 실패 — '+LL.err);
+      LL.testPair(v,function(r){
+        if(!r)return show('Liblouis: 변환 실패(해당 단어는 내장 폴백 대상)');
+        show('Liblouis:  '+dotsStr(r.dots)+'   '+r.ub+'\n역점역:    '+r.back);
+      });
+    });
+  });
   function open(){
     fApi.value=SD.cfg.api||'';fSvc.value=SD.cfg.svc||'';fChr.value=SD.cfg.chr||'';
     fEnc.value=SD.cfg.enc||'cells';fWr.value=SD.cfg.write||'nores-20';fGr.value=SD.cfg.grade||'g2';
+    fEng.value=SD.cfg.engine||'builtin';updateLL();
     bg.classList.add('open');
   }
   function close(){bg.classList.remove('open');}
@@ -1350,10 +1481,14 @@ var SD={
   bg.addEventListener('click',function(e){if(e.target===bg)close();});
   document.getElementById('cfgSave').addEventListener('click',function(){
     SD.cfg.api=fApi.value.trim();SD.cfg.svc=fSvc.value.trim().toLowerCase();SD.cfg.chr=fChr.value.trim().toLowerCase();
-    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.save();close();
-    if(currentFeature)loadFeature(currentFeature,false);   // 등급 변경 즉시 반영
+    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.cfg.engine=fEng.value;SD.save();close();
+    if(SD.cfg.engine==='liblouis'&&LL.status!=='ready'){
+      LL.load(function(ok3){updateLL();logRow('<span class="key">[SETUP] '+escapeHtml(llStatText())+'</span>');if(ok3&&currentFeature)loadFeature(currentFeature,false);});
+    }
+    if(currentFeature)loadFeature(currentFeature,false);   // 등급/엔진 변경 즉시 반영
     logRow('<span class="key">[SETUP] 설정 저장됨</span>');
   });
+  if(SD.cfg.engine==='liblouis')LL.load(function(ok4){if(ok4&&currentFeature)loadFeature(currentFeature,false);});  // 부팅 시 자동 로드
 })();
 
 /* ═══════════ DEPLOY EDITION: LIBRARY PERSISTENCE ═══════════ */
