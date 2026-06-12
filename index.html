@@ -357,6 +357,14 @@
         </div>
       </div>
       <div class="field">
+        <label>TTS Voice — 음성 안내 목소리</label>
+        <div style="display:flex;gap:6px">
+          <select id="cfgVoice" style="flex:1"><option value="">자동 — 기기 내 최고 품질 선택 (권장)</option></select>
+          <button class="btn" id="voiceTest" type="button">듣기</button>
+        </div>
+        <div class="note">기기에 설치된 한국어 음성 목록입니다. Windows에서는 <span style="color:var(--ink-soft)">Edge</span> 브라우저가 신경망 음성(Natural)을 제공해 가장 자연스럽습니다.</div>
+      </div>
+      <div class="field">
         <div class="note">BLE는 저장소에 <span style="color:var(--ink-soft)">DotPadSDK-3.0.0.js</span>가 있으면 공식 SDK로 연결됩니다(스캔·패킷·ACK·하드웨어 키 자동 처리). 위 UUID/인코딩/쓰기 설정은 SDK 파일이 없을 때의 raw 폴백 전용입니다.</div>
       </div>
     </div>
@@ -879,7 +887,44 @@ function createDP(){
 var ttsLog=document.getElementById('ttsLog');
 function stamp(){return new Date().toTimeString().slice(0,8);}
 function logRow(html){var div=document.createElement('div');div.className='tts';div.innerHTML='<span class="t">'+stamp()+'</span>'+html;ttsLog.appendChild(div);ttsLog.scrollTop=ttsLog.scrollHeight;}
-function tts(text){logRow('<span class="spk">'+escapeHtml(text)+'</span>');if(window.SD&&SD.cfg.mute)return;try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(text);u.lang='ko-KR';u.rate=1.05;speechSynthesis.speak(u);}catch(e){}}
+/* ═══ TTS: 기기 내 가장 자연스러운 한국어 음성 자동 선별 (Edge 신경망 > Google > 프리미엄 > 기본) ═══ */
+var TTSV={list:[],pick:null};
+function ttsScore(v){
+  var n=(v.name||'').toLowerCase(),s=0;
+  if(/natural|neural/.test(n))s+=80;                       // Edge: Microsoft ... Online (Natural)
+  if(/google/.test(n))s+=60;                               // Chrome/Android Google 한국어
+  if(/premium|enhanced|siri|yuna|sora|suhyun/.test(n))s+=50; // iOS/macOS 고품질
+  if(/online/.test(n))s+=5;
+  if(v.default)s+=1;
+  return s;
+}
+function refreshVoices(){
+  try{
+    var all=speechSynthesis.getVoices()||[];
+    TTSV.list=all.filter(function(v){return /^ko/i.test(v.lang||'')||/korean|한국/i.test(v.name||'');});
+    TTSV.pick=null;
+    var want=window.SD&&SD.cfg&&SD.cfg.voice;
+    if(want)for(var i=0;i<TTSV.list.length;i++)if(TTSV.list[i].name===want){TTSV.pick=TTSV.list[i];break;}
+    if(!TTSV.pick&&TTSV.list.length){
+      var best=TTSV.list[0];
+      for(var j=1;j<TTSV.list.length;j++)if(ttsScore(TTSV.list[j])>ttsScore(best))best=TTSV.list[j];
+      TTSV.pick=best;
+    }
+  }catch(e){}
+}
+try{refreshVoices();speechSynthesis.addEventListener('voiceschanged',refreshVoices);}catch(e){}
+function tts(text){
+  logRow('<span class="spk">'+escapeHtml(text)+'</span>');
+  if(window.SD&&SD.cfg.mute)return;
+  try{
+    speechSynthesis.cancel();
+    var u=new SpeechSynthesisUtterance(text);
+    u.lang='ko-KR';u.rate=1.05;u.pitch=1;
+    if(!TTSV.pick)refreshVoices();
+    if(TTSV.pick)u.voice=TTSV.pick;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
 function logKey(k){logRow('<span class="key">[KEY] '+k+'</span>');}
 function logErr(m){logRow('<span style="color:#ff8c82">'+escapeHtml(m)+'</span>');}
 function escapeHtml(s){return s.replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
@@ -1445,6 +1490,22 @@ var SD={
   var bg=document.getElementById('modalBg');
   var fApi=document.getElementById('cfgApi'),fSvc=document.getElementById('cfgSvc'),fChr=document.getElementById('cfgChr'),fEnc=document.getElementById('cfgEnc'),fWr=document.getElementById('cfgWrite'),fGr=document.getElementById('cfgGrade');
   var fEng=document.getElementById('cfgEngine'),llStat=document.getElementById('llStat'),brlIn=document.getElementById('brlIn'),brlGo=document.getElementById('brlGo'),brlOut=document.getElementById('brlOut');
+  var fVoice=document.getElementById('cfgVoice');
+  function fillVoices(){
+    refreshVoices();
+    while(fVoice.options.length>1)fVoice.remove(1);
+    for(var i=0;i<TTSV.list.length;i++){
+      var v=TTSV.list[i],o=document.createElement('option');
+      o.value=v.name;o.textContent=v.name+(TTSV.pick&&TTSV.pick.name===v.name&&!(SD.cfg.voice)?' ← 자동 선택됨':'');
+      fVoice.appendChild(o);
+    }
+    fVoice.value=SD.cfg.voice||'';
+  }
+  document.getElementById('voiceTest').addEventListener('click',function(){
+    var prev=SD.cfg.voice;SD.cfg.voice=fVoice.value;refreshVoices();
+    tts('안녕하세요. 닷패드 음성 안내 테스트입니다.');
+    SD.cfg.voice=prev;refreshVoices();
+  });
   function llStatText(){
     if(LL.status==='ready')return 'Liblouis: 사용 중 (v'+LL.ver+') · 실패 단어는 내장 변환기로 자동 폴백';
     if(LL.status==='loading')return 'Liblouis: 로딩 중...';
@@ -1471,7 +1532,7 @@ var SD={
   function open(){
     fApi.value=SD.cfg.api||'';fSvc.value=SD.cfg.svc||'';fChr.value=SD.cfg.chr||'';
     fEnc.value=SD.cfg.enc||'cells';fWr.value=SD.cfg.write||'nores-20';fGr.value=SD.cfg.grade||'g2';
-    fEng.value=SD.cfg.engine||'builtin';updateLL();
+    fEng.value=SD.cfg.engine||'builtin';updateLL();fillVoices();
     bg.classList.add('open');
   }
   function close(){bg.classList.remove('open');}
@@ -1481,7 +1542,7 @@ var SD={
   bg.addEventListener('click',function(e){if(e.target===bg)close();});
   document.getElementById('cfgSave').addEventListener('click',function(){
     SD.cfg.api=fApi.value.trim();SD.cfg.svc=fSvc.value.trim().toLowerCase();SD.cfg.chr=fChr.value.trim().toLowerCase();
-    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.cfg.engine=fEng.value;SD.save();close();
+    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.cfg.engine=fEng.value;SD.cfg.voice=fVoice.value;refreshVoices();SD.save();close();
     if(SD.cfg.engine==='liblouis'&&LL.status!=='ready'){
       LL.load(function(ok3){updateLL();logRow('<span class="key">[SETUP] '+escapeHtml(llStatText())+'</span>');if(ok3&&currentFeature)loadFeature(currentFeature,false);});
     }
