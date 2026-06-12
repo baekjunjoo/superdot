@@ -13,7 +13,7 @@
   :root{
     --bg:#000;--panel:#0A0A0A;--panel-2:#0E0E0E;
     --line:#2A2A2A;--line-soft:#1A1A1A;
-    --ink:#FFFFFF;--ink-soft:#9A9A9A;--ink-dim:#5E5E5E;
+    --ink:#FFFFFF;--ink-soft:#A6A6A6;--ink-dim:#7A7A7A;
     --ok:#46C46A;
     --din:'Archivo',-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif;
     --mono:'JetBrains Mono',ui-monospace,"SF Mono",Consolas,monospace;
@@ -49,7 +49,7 @@
   .modal .body{padding:18px 22px;display:flex;flex-direction:column;gap:14px}
   .field label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
   .field input,.field select{width:100%;background:#000;color:var(--ink);border:1px solid var(--line);border-radius:0;padding:9px 12px;font-family:var(--mono);font-size:12px}
-  .field input:focus,.field select:focus{outline:none;border-color:var(--ink)}
+  .field input:focus,.field select:focus{border-color:var(--ink)}
   .field .note{font-size:11px;color:var(--ink-dim);margin-top:5px;line-height:1.5}
   .modal .foot{padding:16px 22px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end}
   .frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -103,7 +103,7 @@
   .inputArea{padding:18px 22px}
   textarea{width:100%;resize:vertical;min-height:84px;background:#000;color:var(--ink);border:1px solid var(--line);border-radius:0;padding:12px 14px;font:inherit;font-size:13.5px;letter-spacing:.01em}
   textarea::placeholder{color:var(--ink-dim)}
-  textarea:focus{outline:none;border-color:var(--ink)}
+  textarea:focus{border-color:var(--ink)}
   .row{display:flex;gap:10px;margin-top:12px;align-items:center}
   .hint{font-size:11px;color:var(--ink-dim);letter-spacing:.08em;text-transform:uppercase;font-family:var(--mono)}
 
@@ -128,7 +128,7 @@
   .hwkey:hover{background:var(--ink);color:#000}
   .hwkey:active{transform:translateY(1px)}
   .hwkey.pan{min-width:78px}
-  .keycap{display:block;font-size:8.5px;color:var(--ink-dim);margin-top:3px;letter-spacing:.1em}
+  .keycap{display:block;font-size:8.5px;color:#8A8A8A;margin-top:3px;letter-spacing:.1em}
   .hwkey:hover .keycap{color:#444}
 
   #ttsLog{padding:16px 22px;max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:7px}
@@ -178,9 +178,43 @@
     font-optical-sizing:auto;
     font-variation-settings:"ROND" 0;
   }
+
+  /* == WCAG 2.1 AA & mobile responsive == */
+  .skip{position:absolute;left:-9999px;top:0;z-index:200;background:var(--ink);color:#000;padding:12px 18px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:12px}
+  .skip:focus{left:0}
+  button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .sr-status{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+  @media(pointer:coarse){
+    .chip{padding:11px 14px;font-size:11.5px}
+    .navbtn{padding:10px 13px}
+    .hwkey{padding:13px 16px}
+    .libItem button{padding:10px 13px;font-size:11px}
+    .modal h3 button{padding:8px;margin:-8px}
+  }
+  @media(max-width:560px){
+    nav{padding:14px 16px;gap:12px}
+    .navstatus{gap:10px}
+    .navstatus span{display:none}
+    .hero-inner{padding:0 16px 48px}
+    .section-head{padding:36px 16px 22px}
+    .inputArea{padding:14px 16px}
+    .row{flex-wrap:wrap}
+    .hint{display:none}
+    .actbtn{flex:1 1 30%;min-width:96px}
+    #chatLog{padding:14px 16px;max-height:300px}
+    .deviceWrap{padding:16px 10px}
+    .device{padding:12px 10px 10px}
+    .block-head{padding:12px 16px}
+    #library,#ttsLog{padding:12px 16px}
+    details{padding:0 16px 16px}
+    .step{padding:22px 16px}
+    footer{padding:26px 16px;gap:16px}
+    footer .copy{margin-left:0;flex-basis:100%}
+  }
 </style>
 </head>
 <body>
+<a class="skip" href="#main">본문 바로가기 — 기능 생성</a>
 
 <nav id="nav">
   <div class="wordmark">SUPER&nbsp;DOT</div>
@@ -211,10 +245,11 @@
   <div class="scrollcue">SCROLL &darr;</div>
 </header>
 
+<main id="main">
 <section class="section" id="process">
   <div class="section-head">
     <span class="section-num">01</span>
-    <span class="section-title">Process</span>
+    <h2 class="section-title">Process</h2>
     <span class="section-desc">사용자 테스트 사이클을 기다리지 않고, 고객 피드백이 그 자리에서 작동하는 기능이 됩니다.</span>
   </div>
   <div class="steps">
@@ -227,7 +262,7 @@
 <section class="section" id="build">
   <div class="section-head">
     <span class="section-num">02</span>
-    <span class="section-title">Feature Builder</span>
+    <h2 class="section-title">Feature Builder</h2>
     <span class="section-desc">자연어 요청을 DotPad 런타임 코드로 변환합니다. 출력은 항상 60&times;40 이진 디스플레이가 표현 가능한 범위로 제한됩니다.</span>
   </div>
   <div class="grid">
@@ -267,7 +302,7 @@
         <div class="deviceWrap">
           <div class="device">
             <div class="deviceHead"><span class="lbl">DOT PAD</span><span id="featureName">&mdash;</span></div>
-            <canvas id="pad" width="672" height="452" aria-label="DotPad 60x40 시뮬레이터"></canvas>
+            <canvas id="pad" role="img" aria-label="닷패드 시뮬레이터 — 60×40 점자 핀 출력 미리보기" width="672" height="452" aria-label="DotPad 60x40 시뮬레이터"></canvas>
           </div>
           <div class="keys">
             <button class="hwkey pan" data-key="PAN_LEFT">&#9664; PAN<span class="keycap">&larr; KEY</span></button>
@@ -288,6 +323,7 @@
   </div>
 </section>
 
+</main>
 <footer>
   <span class="fwm">SUPER DOT</span>
   <div class="flinks"><a href="#build">BUILD</a><a href="#simulator">SIMULATOR</a><a href="#console">CONSOLE</a></div>
@@ -450,8 +486,7 @@
       x.fill();
     }
     x.globalCompositeOperation='source-over';
-    if(!reduce) t+=1;
-    requestAnimationFrame(draw);
+    if(!reduce){t+=1;requestAnimationFrame(draw);}
   }
   draw();
 })();
@@ -935,7 +970,8 @@ function tts(text){
   }catch(e){}
 }
 function logKey(k){logRow('<span class="key">[KEY] '+k+'</span>');}
-function logErr(m){logRow('<span style="color:#ff8c82">'+escapeHtml(m)+'</span>');}
+function announce(m){var el=document.getElementById('srStatus');if(!el)return;el.textContent='';setTimeout(function(){el.textContent=m;},30);}
+function logErr(m){logRow('<span style="color:#ff8c82">'+escapeHtml(m)+'</span>');announce('오류: '+m);}
 function escapeHtml(s){return s.replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 
 /* FEATURE LOADER */
@@ -1754,11 +1790,11 @@ var BLE={
     if(code==='Connected'){
       // 보드 정보 수신 완료 — 이 시점부터 그래픽/텍스트 라인 전송이 유효
       BLE.ready=true;BLE.lastSent=null;BLE.lastTextHex=null;
-      logRow('<span class="key">[BLE] 디바이스 준비 완료(BoardInfo) \u00B7 출력 동기화</span>');
+      announce('닷패드 연결 완료');logRow('<span class="key">[BLE] 디바이스 준비 완료(BoardInfo) \u00B7 출력 동기화</span>');
       if(BLE.connected){BLE.push(frameBuf);BLE.pushText(textBuf);}
       BLE.startKeepalive();
     }
-    else if(code==='Disconnected'){logRow('<span class="key">[BLE] 연결 해제됨</span>');BLE.onDisconnect();}
+    else if(code==='Disconnected'){announce('닷패드 연결 해제됨');logRow('<span class="key">[BLE] 연결 해제됨</span>');BLE.onDisconnect();}
     else if(code==='ConnectedFail'){logErr('BLE 연결 실패: '+msg);BLE.onDisconnect();}
     else if(code==='CommandError'){logErr('DotPad 명령 오류: '+msg);}
   },
@@ -1957,5 +1993,6 @@ document.getElementById('importBtn').addEventListener('click',function(){
 })();
 
 </script>
+<div id="srStatus" class="sr-status" role="status" aria-live="polite"></div>
 </body>
 </html>
