@@ -290,7 +290,7 @@
 <footer>
   <span class="fwm">SUPER DOT</span>
   <div class="flinks"><a href="#build">BUILD</a><a href="#simulator">SIMULATOR</a><a href="#console">CONSOLE</a></div>
-  <span class="copy">DOT INC &middot; INTERNAL PROTOTYPE &middot; v1.3</span>
+  <span class="copy">DOT INC &middot; INTERNAL PROTOTYPE &middot; v2.0</span>
 </footer>
 
 <div class="modal-bg" id="modalBg">
@@ -787,6 +787,259 @@ function escapeHtml(s){return s.replace(/[&<>"]/g,function(c){return{'&':'&amp;'
 
 /* FEATURE LOADER */
 var featureNameEl=document.getElementById('featureName'),codeBox=document.getElementById('codeBox'),codeView=document.getElementById('codeView'),currentFeature=null;
+/* ═══════════ SPEC ENGINE: 선언적 템플릿 — 코드 생성 없이 조합으로 기능 구성 ═══════════ */
+
+function drawBrailleBlock(dp,str,opts){          // 그래픽 영역 멀티라인 점자
+  opts=opts||{};var per=opts.per||20,lines=opts.lines||8,gy=opts.gapY||5;
+  var POS={1:[0,0],2:[0,1],3:[0,2],4:[1,0],5:[1,1],6:[1,2]};
+  var cells=dp.brailleCells(str),max=per*lines,off=0;
+  if(cells.length>max)off=Math.ceil((cells.length-max)/per)*per;
+  dp.clear();
+  for(var i=off;i<cells.length;i++){
+    var n=i-off,x=(n%per)*3,y=Math.floor(n/per)*gy,dots=cells[i];
+    for(var d=0;d<dots.length;d++){var p=POS[dots[d]];dp.set(x+p[0],y+p[1]);}
+  }
+}
+
+var TEMPLATES={
+bar_chart:{
+ schema:'data:숫자배열 2~12개(필수) · labels:문자배열(선택, data와 동일 길이) · title:짧은영문 · unit:읽기단위(한글)',
+ defaults:{title:'chart',data:[10,20,30,40],labels:null,unit:''},
+ run:function(dp,p){
+  var data=(p.data||[]).map(Number).filter(isFinite).slice(0,12);
+  if(data.length<2)data=[10,20,30,40];
+  var labels=(p.labels&&p.labels.length===data.length)?p.labels.map(String):data.map(function(_,i){return 'v'+(i+1);});
+  var max=Math.max.apply(null,data.map(Math.abs))||1,n=data.length;
+  var bw=Math.max(2,Math.floor(46/n)-1),gap=Math.max(1,Math.floor((52-n*bw)/(n+1))),base=34;
+  dp.clear();dp.line(4,base,57,base);dp.line(4,base+1,57,base+1);
+  for(var i=0;i<n;i++){var x=5+gap+i*(bw+gap),h=Math.max(1,Math.round(Math.abs(data[i])/max*28));dp.rect(x,base-h,bw,h,{fill:true});}
+  dp.textLine(p.title||'chart');dp.state.i=-1;
+  function read(i){dp.textLine(labels[i]+': '+data[i]);dp.speak(labels[i]+', '+data[i]+(p.unit||''));}
+  dp.onKey(function(k){
+   if(k==='F1'||k==='PAN_RIGHT'){dp.state.i=(dp.state.i+1)%n;read(dp.state.i);}
+   else if(k==='PAN_LEFT'){dp.state.i=(dp.state.i+n-1)%n;read(dp.state.i);}
+   else if(k==='F2'&&dp.state.i>=0)read(dp.state.i);
+  });
+ }},
+plot:{
+ schema:'fn:"sin"|"cos"|"abs"|"saw"(기본 sin) · cycles:1~6 주기',
+ defaults:{fn:'sin',cycles:1},
+ run:function(dp,p){
+  var fns={sin:function(t){return Math.sin(t*6.2832);},cos:function(t){return Math.cos(t*6.2832);},
+           abs:function(t){return Math.abs(Math.sin(t*6.2832));},saw:function(t){return 2*(t%1)-1;}};
+  var f=fns[p.fn]||fns.sin;
+  function draw(c){
+   dp.clear();dp.line(0,20,59,20);dp.line(2,2,2,38);
+   for(var x=3;x<60;x++){var t=(x-3)/56*c,y=20-Math.round(15*f(t));y=Math.max(0,Math.min(39,y));dp.set(x,y);dp.set(x,y+(y<20?1:-1));}
+   dp.textLine((p.fn||'sin')+' x'+c);
+  }
+  dp.state.c=Math.max(1,Math.min(6,(p.cycles|0)||1));draw(dp.state.c);
+  dp.onKey(function(k){if(k==='F1'){dp.state.c=dp.state.c%6+1;draw(dp.state.c);dp.speak('주기 '+dp.state.c);}});
+ }},
+dice:{
+ schema:'sides:2~9(기본 6)',
+ defaults:{sides:6},
+ run:function(dp,p){
+  var sides=Math.max(2,Math.min(9,(p.sides|0)||6));
+  var P={1:[[1,1]],2:[[0,0],[2,2]],3:[[0,0],[1,1],[2,2]],4:[[0,0],[2,0],[0,2],[2,2]],5:[[0,0],[2,0],[1,1],[0,2],[2,2]],6:[[0,0],[2,0],[0,1],[2,1],[0,2],[2,2]]};
+  function face(n){dp.clear();dp.rect(17,4,26,26);dp.rect(18,5,24,24);
+   if(n<=6){P[n].forEach(function(q){dp.rect(21+q[0]*8,8+q[1]*8,3,3,{fill:true});});}
+   else{dp.text(String(n),26,11);}}
+  dp.state.busy=false;face(1);dp.textLine('dice: press f1');
+  dp.onKey(function(k){if(k==='F1'&&!dp.state.busy){dp.state.busy=true;var n=1+Math.floor(Math.random()*sides),i=0;
+   var t=dp.interval(90,function(){face(1+Math.floor(Math.random()*sides));if(++i>5){clearInterval(t);face(n);dp.state.busy=false;dp.textLine('dice: '+n);dp.speak('결과 '+n);}});}});
+ }},
+clock:{
+ schema:'(파라미터 없음) 아날로그+디지털 시계',
+ defaults:{},
+ run:function(dp,p){
+  function draw(){var d=new Date(),h=d.getHours()%12,m=d.getMinutes();
+   dp.clear();dp.circle(30,19,17);dp.set(30,3);dp.set(46,19);dp.set(30,35);dp.set(14,19);
+   var ma=m/60*6.2832-1.5708,ha=(h+m/60)/12*6.2832-1.5708;
+   dp.line(30,19,30+Math.round(8*Math.cos(ha)),19+Math.round(8*Math.sin(ha)));
+   dp.line(30,19,30+Math.round(13*Math.cos(ma)),19+Math.round(13*Math.sin(ma)));
+   dp.textLine(('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2));}
+  draw();dp.interval(15000,draw);
+  dp.onKey(function(k){if(k==='F1'){var d=new Date();dp.speak('현재 시각 '+d.getHours()+'시 '+d.getMinutes()+'분');}});
+ }},
+rps:{
+ schema:'(파라미터 없음) F1 가위 F2 바위 F3 보',
+ defaults:{},
+ run:function(dp,p){
+  var names=['가위','바위','보'];
+  function icon(n){dp.clear();
+   if(n===0){dp.line(20,8,38,28);dp.line(21,8,39,28);dp.line(38,8,20,28);dp.line(39,8,21,28);}
+   else if(n===1){dp.circle(29,18,9,{fill:true});}
+   else{dp.rect(18,7,24,22);dp.rect(19,8,22,20);}}
+  dp.textLine('rps: f1 f2 f3');
+  dp.onKey(function(k){var me={'F1':0,'F2':1,'F3':2}[k];if(me===undefined)return;
+   var cpu=Math.floor(Math.random()*3);icon(cpu);
+   var r=(me-cpu+3)%3,txt=r===0?'draw':(r===1?'win':'lose');
+   dp.textLine(txt);
+   dp.speak('컴퓨터는 '+names[cpu]+'. '+(r===0?'무승부':(r===1?'당신의 승리':'당신의 패배')));});
+ }},
+maze:{
+ schema:'step:이동 칸수 1~4(기본 2)',
+ defaults:{step:2},
+ run:function(dp,p){
+  var st=Math.max(1,Math.min(4,(p.step|0)||2));
+  var walls=[[0,0,60,2],[0,38,52,2],[0,0,2,40],[58,0,2,30],
+   [10,2,2,26],[18,12,2,28],[28,2,2,26],[38,12,2,28],[48,2,2,20]];
+  dp.state.x=4;dp.state.y=4;
+  function hit(x,y){if(x<2||y<2||x>57||y>37)return!(x>=52&&y>=33);
+   for(var i=0;i<walls.length;i++){var w=walls[i];if(x+1>=w[0]&&x<w[0]+w[2]&&y+1>=w[1]&&y<w[1]+w[3])return true;}return false;}
+  function draw(){dp.clear();walls.forEach(function(w){dp.rect(w[0],w[1],w[2],w[3],{fill:true});});
+   dp.rect(dp.state.x,dp.state.y,2,2,{fill:true});}
+  draw();dp.textLine('maze: find exit');
+  dp.onKey(function(k){var dx=0,dy=0;
+   if(k==='F1')dy=-st;else if(k==='F4')dy=st;else if(k==='PAN_LEFT')dx=-st;else if(k==='PAN_RIGHT')dx=st;else return;
+   var nx=dp.state.x+dx,ny=dp.state.y+dy;
+   if(nx>=56&&ny>=32){dp.state.x=nx;dp.state.y=ny;draw();dp.textLine('escape!');dp.speak('탈출 성공! 축하합니다.');return;}
+   if(hit(nx,ny)){dp.speak('벽입니다');return;}
+   dp.state.x=nx;dp.state.y=ny;draw();});
+ }},
+caption:{
+ schema:'(파라미터 없음) 마이크 음성 → 멀티라인 점자 자막. F1 지우기 F2 일시정지',
+ defaults:{},
+ run:function(dp,p){
+  dp.state.txt='';dp.state.tmp='';dp.state.on=true;dp.state._rt=0;
+  function render(){drawBrailleBlock(dp,dp.state.txt+dp.state.tmp);}
+  function requestRender(){
+   if(dp.state._rt)return;
+   dp.state._rt=dp.timeout(120,function(){dp.state._rt=0;render();});
+  }
+  dp.textLine('live caption');render();
+  dp.listen(function(t,fin){
+   if(!dp.state.on)return;
+   if(fin){dp.state.txt+=t+' ';dp.state.tmp='';}else{dp.state.tmp=t;}
+   requestRender();
+  });
+  dp.onKey(function(k){
+   if(k==='F1'){dp.state.txt='';dp.state.tmp='';render();dp.speak('자막을 지웠습니다');}
+   else if(k==='F2'){dp.state.on=!dp.state.on;dp.textLine(dp.state.on?'live caption':'paused');dp.speak(dp.state.on?'자막 재개':'자막 일시정지');}
+  });
+ }},
+list_nav:{
+ schema:'items:문자배열(필수) · title:짧은영문 — 팬 키로 항목 탐색, F1 다시 읽기, F2 처음으로',
+ defaults:{title:'list',items:['하나','둘','셋']},
+ run:function(dp,p){
+  var items=(p.items||[]).map(String).filter(function(t){return t.length;}).slice(0,40);
+  if(!items.length)items=['항목 없음'];
+  dp.state.i=-1;
+  function draw(){
+   dp.clear();
+   var n=items.length;
+   for(var i=0;i<n&&i<18;i++){
+    var y=3+i*2;
+    dp.set(4,y);dp.set(5,y);
+    if(i===dp.state.i){dp.rect(2,y-1,56,3);}
+   }
+   if(dp.state.i>=0)drawListItem();
+  }
+  function drawListItem(){
+   var t=items[dp.state.i];
+   var POS={1:[0,0],2:[0,1],3:[0,2],4:[1,0],5:[1,1],6:[1,2]};
+   var cells=dp.brailleCells(t).slice(0,16);
+   for(var c=0;c<cells.length;c++){var x=8+c*3,dots=cells[c];
+    for(var d=0;d<dots.length;d++){var q=POS[dots[d]];dp.set(x+q[0],22+q[1]);}}
+  }
+  function read(){var t=items[dp.state.i];dp.textLine((dp.state.i+1)+'/'+items.length+' '+t);dp.speak((dp.state.i+1)+'번, '+t);draw();}
+  draw();dp.textLine(p.title||'list');
+  dp.onKey(function(k){
+   if(k==='PAN_RIGHT'||k==='F1'&&dp.state.i<0){dp.state.i=(dp.state.i+1)%items.length;read();}
+   else if(k==='PAN_LEFT'){dp.state.i=(dp.state.i+items.length-1)%items.length;read();}
+   else if(k==='F1'&&dp.state.i>=0)read();
+   else if(k==='F2'){dp.state.i=0;read();}
+  });
+ }},
+quiz:{
+ schema:'questions:[{q:질문, options:[보기3개], answer:정답인덱스0~2}] 배열(필수) — F1~F3 선택',
+ defaults:{questions:[{q:'1 더하기 1은?',options:['1','2','3'],answer:1}]},
+ run:function(dp,p){
+  var qs=(p.questions||[]).filter(function(q){return q&&q.q&&q.options&&q.options.length>=2;}).slice(0,20);
+  if(!qs.length)qs=[{q:'1 더하기 1은?',options:['1','2','3'],answer:1}];
+  dp.state.i=0;dp.state.score=0;dp.state.done=false;
+  function ask(){
+   var q=qs[dp.state.i];dp.clear();
+   dp.textLine('q'+(dp.state.i+1)+'/'+qs.length);
+   dp.rect(24,14,12,12);dp.text('q'+(dp.state.i+1),26,17);
+   var opts=q.options.map(function(o,j){return (j+1)+'번 '+o;}).join(', ');
+   dp.speak('문제 '+(dp.state.i+1)+'. '+q.q+'. '+opts);
+  }
+  function feedback(ok){
+   dp.clear();
+   if(ok){dp.circle(30,19,12);dp.circle(30,19,11);}
+   else{dp.line(18,7,42,31);dp.line(19,7,43,31);dp.line(42,7,18,31);dp.line(43,7,19,31);}
+   dp.textLine(ok?'correct':'wrong');
+  }
+  ask();
+  dp.onKey(function(k){
+   if(dp.state.done){if(k==='F2'){dp.state.i=0;dp.state.score=0;dp.state.done=false;ask();}return;}
+   var sel={'F1':0,'F2':1,'F3':2}[k];if(sel===undefined||sel>=qs[dp.state.i].options.length)return;
+   var q=qs[dp.state.i],ok=(sel===q.answer);
+   if(ok)dp.state.score++;
+   feedback(ok);
+   dp.speak(ok?'정답입니다':'오답입니다. 정답은 '+(q.answer+1)+'번 '+q.options[q.answer]);
+   dp.timeout(2200,function(){
+    dp.state.i++;
+    if(dp.state.i>=qs.length){dp.state.done=true;dp.textLine('score '+dp.state.score+'/'+qs.length);dp.speak('끝났습니다. '+qs.length+'문제 중 '+dp.state.score+'개 정답. F2로 다시 시작합니다.');}
+    else ask();
+   });
+  });
+ }},
+timer:{
+ schema:'seconds:초(기본 60) · mode:"countdown"|"stopwatch" — F1 시작/일시정지, F2 리셋',
+ defaults:{seconds:60,mode:'countdown'},
+ run:function(dp,p){
+  var total=Math.max(1,Math.min(5940,(p.seconds|0)||60));
+  var down=(p.mode!=='stopwatch');
+  dp.state.t=down?total:0;dp.state.run=false;
+  function fmt(t){var m=Math.floor(t/60),s=t%60;return ('0'+m).slice(-2)+':'+('0'+s).slice(-2);}
+  function draw(){
+   dp.clear();
+   var frac=down?dp.state.t/total:Math.min(1,dp.state.t/total);
+   var w=Math.round(frac*56);
+   dp.rect(2,16,56,8);
+   if(w>0)dp.rect(2,16,w,8,{fill:true});
+   dp.textLine((down?'timer ':'sw ')+fmt(dp.state.t));
+  }
+  draw();
+  dp.interval(1000,function(){
+   if(!dp.state.run)return;
+   dp.state.t+=down?-1:1;
+   if(down&&dp.state.t<=0){dp.state.t=0;dp.state.run=false;draw();dp.textLine('time up!');dp.speak('시간이 다 됐습니다');return;}
+   draw();
+  });
+  dp.onKey(function(k){
+   if(k==='F1'){dp.state.run=!dp.state.run;dp.speak(dp.state.run?'시작':'일시정지');}
+   else if(k==='F2'){dp.state.run=false;dp.state.t=down?total:0;draw();dp.speak('리셋');}
+   else if(k==='F3'){dp.speak((down?'남은 시간 ':'경과 시간 ')+Math.floor(dp.state.t/60)+'분 '+dp.state.t%60+'초');}
+  });
+ }},
+text_show:{
+ schema:'text:표시할 문장(필수) — 그래픽 멀티라인 점자 + 텍스트 라인 + 음성',
+ defaults:{text:'안녕하세요'},
+ run:function(dp,p){
+  var t=String(p.text||'안녕하세요');
+  drawBrailleBlock(dp,t);
+  dp.textLine(t);
+  dp.onKey(function(k){if(k==='F1')dp.speak(t);});
+  dp.speak(t);
+ }}
+};
+
+function runSpec(dp,spec){
+  var t=TEMPLATES[spec.template];
+  if(!t)throw new Error('알 수 없는 템플릿: '+spec.template);
+  t.run(dp,Object.assign({},t.defaults,spec.params||{}));
+}
+function specFeature(spec,meta){
+  meta=meta||{};
+  return {id:meta.id||Date.now(),name:meta.name||('SPEC: '+spec.template),
+    description:meta.description||(TEMPLATES[spec.template]?TEMPLATES[spec.template].schema:''),
+    tts_intro:meta.tts_intro||'',request:meta.request||'(스펙)',spec:spec};
+}
+
 function loadFeature(feature,speakIntro){
   if(speakIntro===undefined)speakIntro=true;
   if(currentDP)currentDP._destroy();
@@ -794,9 +1047,12 @@ function loadFeature(feature,speakIntro){
   frameBuf.fill(0);textBuf.fill(0);requestPaint();
   currentDP=createDP();currentFeature=feature;
   featureNameEl.textContent=feature.name||'\u2014';
-  codeView.textContent=feature.code;codeBox.hidden=false;
-  try{var fn=new Function('dp',feature.code);fn(currentDP);if(speakIntro&&feature.tts_intro)tts(feature.tts_intro);renderLibrary();return true;}
-  catch(e){logErr('기능 실행 오류: '+e.message);return false;}
+  codeView.textContent=feature.spec?JSON.stringify(feature.spec,null,1):feature.code;codeBox.hidden=false;
+  try{
+    if(feature.spec)runSpec(currentDP,feature.spec);
+    else{var fn=new Function('dp',feature.code);fn(currentDP);}
+    if(speakIntro&&feature.tts_intro)tts(feature.tts_intro);renderLibrary();return true;
+  }catch(e){logErr('기능 실행 오류: '+e.message);return false;}
 }
 
 /* KEYS */
@@ -834,6 +1090,90 @@ var SYSTEM_PROMPT=[
 var input=document.getElementById('input'),genBtn=document.getElementById('genBtn'),newBtn=document.getElementById('newBtn'),chatLog=document.getElementById('chatLog'),contextFeature=null;
 function addMsg(cls,html){var d=document.createElement('div');d.className='msg '+cls;d.innerHTML=html;chatLog.appendChild(d);chatLog.scrollTop=chatLog.scrollHeight;return d;}
 
+/* ═══════════ TIER 2: 로컬 매칭 — 키워드 점수 + 정규식 파라미터 추출 (오프라인) ═══════════ */
+var MATCH_RULES=[
+ {t:'rps',kw:[['가위바위보',5],['가위 바위 보',5]]},
+ {t:'dice',kw:[['주사위',5],['굴리',1]]},
+ {t:'maze',kw:[['미로',5]]},
+ {t:'caption',kw:[['자막',5],['받아쓰',5],['받아 적',4],['말하면',2],['음성',1]]},
+ {t:'clock',kw:[['시계',5],['시각',4],['몇 시',4]]},
+ {t:'timer',kw:[['타이머',5],['카운트다운',5],['스톱워치',5],['스탑워치',5]]},
+ {t:'quiz',kw:[['퀴즈',5],['문제 내',4],['시험',2],['맞히',2],['맞추',2]],needAI:true},
+ {t:'plot',kw:[['사인',5],['코사인',5],['싸인',5],['파형',4],['곡선',3],['함수',2]]},
+ {t:'bar_chart',kw:[['막대',4],['차트',3],['매출',2],['통계',2],['그래프',2],['비교',1]]},
+ {t:'list_nav',kw:[['메뉴',4],['목록',4],['리스트',4],['단계',2],['순서',2],['차례',2]]},
+ {t:'text_show',kw:[['점자로',4],['점자 출력',4],['써줘',2],['보여줘',1],['표시해',1]]}
+];
+function extractItems(req){            // "메뉴: 김치찌개, 된장찌개" / "a, b, c 목록"
+  var part=req,m=req.match(/[:：](.+)$/);
+  if(m)part=m[1];
+  if(part.indexOf(',')<0&&part.indexOf('、')<0)return null;
+  var items=part.split(/[,、]/).map(function(t){return t.trim().replace(/(을|를|으로|로)?\s*(목록|메뉴|리스트|만들어줘|만들어|보여줘|해줘)?\s*$/,'').trim();})
+    .filter(function(t){return t.length>0&&t.length<=20;});
+  return items.length>=2?items:null;
+}
+function localMatch(req){
+  var best=null,second=0;
+  for(var i=0;i<MATCH_RULES.length;i++){
+    var r=MATCH_RULES[i],sc=0;
+    for(var j=0;j<r.kw.length;j++)if(req.indexOf(r.kw[j][0])>=0)sc+=r.kw[j][1];
+    if(sc>0){if(!best||sc>best.score){if(best)second=best.score;best={rule:r,score:sc};}else if(sc>second)second=sc;}
+  }
+  if(!best||best.score<3)return null;
+  var t=best.rule.t,params={},needAI=!!best.rule.needAI;
+  var nums=(req.match(/-?\d+(?:\.\d+)?/g)||[]).map(Number);
+  if(t==='bar_chart'){
+    if(nums.length>=2&&nums.length<=12)params.data=nums;
+    var it=extractItems(req);if(it&&params.data&&it.length===params.data.length)params.labels=it;
+  }
+  else if(t==='plot'){params.fn=/코사인/.test(req)?'cos':'sin';if(nums[0]>=1&&nums[0]<=6)params.cycles=nums[0];}
+  else if(t==='dice'){if(nums[0]>=2&&nums[0]<=9)params.sides=nums[0];}
+  else if(t==='maze'){if(nums[0]>=1&&nums[0]<=4)params.step=nums[0];}
+  else if(t==='timer'){
+    var mm=req.match(/(\d+)\s*분/),ss=req.match(/(\d+)\s*초/);
+    var sec=(mm?+mm[1]*60:0)+(ss?+ss[1]:0);
+    if(sec>0)params.seconds=sec;
+    if(/스톱워치|스탑워치/.test(req))params.mode='stopwatch';
+  }
+  else if(t==='list_nav'){
+    var items=extractItems(req);
+    if(items)params.items=items;else needAI=true;     // 항목 없으면 AI가 채움
+  }
+  else if(t==='text_show'){
+    var q=req.match(/["'“”‘'](.+?)["'“”‘']/);
+    if(q)params.text=q[1];else needAI=true;
+  }
+  return {template:t,params:params,score:best.score,needAI:needAI};
+}
+
+/* ═══════════ TIER 3: AI 슬롯 채우기 — 템플릿+파라미터 JSON만 (저토큰) ═══════════ */
+var SLOT_PROMPT=(function(){
+  var lines=['당신은 Super Dot의 요청 분류기입니다. 사용자의 요청을 아래 템플릿 중 하나와 파라미터로 변환합니다.','',
+    '템플릿 카탈로그:'];
+  for(var k in TEMPLATES)lines.push('- '+k+' — '+TEMPLATES[k].schema);
+  lines.push('','규칙:',
+    '1. 반드시 JSON 하나만 출력. 코드펜스/설명 금지.',
+    '2. 형식: {"template":"이름","params":{...},"name":"기능명(한글, 짧게)","tts_intro":"로드 시 음성 안내 한 문장"}',
+    '3. 어떤 템플릿으로도 표현할 수 없는 새로운 메커니즘이면 {"template":null} 만 출력.',
+    '4. [현재 스펙]이 주어지고 요청이 수정이면, 수정 반영된 같은 형식의 JSON을 출력.',
+    '5. params는 해당 템플릿 스키마의 키만 사용. 데이터를 지어내야 하면 요청 맥락에 맞게 간결히.');
+  return lines.join('\n');
+})();
+function slotFill(req,currentSpec){
+  var content=currentSpec?'[현재 스펙] '+JSON.stringify(currentSpec)+'\n[사용자 요청] '+req:req;
+  return fetch(SD.api(),{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,system:SLOT_PROMPT,messages:[{role:'user',content:content}]})})
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if(data.error)throw new Error(data.error.message||'API 오류');
+    var raw=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n').trim();
+    raw=raw.replace(/```json|```/g,'').trim();
+    var i=raw.indexOf('{'),j=raw.lastIndexOf('}');
+    if(i<0||j<=i)throw new Error('슬롯 응답 파싱 실패');
+    return JSON.parse(raw.slice(i,j+1));
+  });
+}
+
 function callClaude(userContent){
   return fetch(SD.api(),{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:(SD.cfg.api?2000:1000),system:SYSTEM_PROMPT,messages:[{role:'user',content:userContent}]})})
@@ -857,9 +1197,51 @@ function callClaude(userContent){
 function generate(){
   var req=input.value.trim();if(!req)return;
   input.value='';addMsg('user',escapeHtml(req));
+
+  function finish(feature,tierMsg){
+    contextFeature=feature;
+    library=library.filter(function(f){return f.id!==feature.id;});library.unshift(feature);renderLibrary();
+    addMsg('ai','<span class="ftitle">\u2713 '+escapeHtml(feature.name)+'</span><div class="small">'+escapeHtml(feature.description||'')+'</div><div class="small">'+tierMsg+'</div>');
+  }
+
+  /* ── T1: 라이브러리 재사용 (0 토큰) ── */
+  var hitLib=null;
+  for(var li=0;li<library.length;li++){
+    var f=library[li];
+    if(f.request===req||f.name===req||(req.length>=4&&f.name&&f.name.indexOf(req)>=0)){hitLib=f;break;}
+  }
+  if(hitLib){
+    if(loadFeature(hitLib)){finish(hitLib,'[T1] 라이브러리 재사용 \u00B7 API 미사용');return;}
+  }
+
+  /* ── T1.5: 현재 스펙 기능의 데이터 즉석 수정 (숫자만 있는 요청) ── */
+  var nums=(req.match(/-?\d+(?:\.\d+)?/g)||[]).map(Number);
+  if(contextFeature&&contextFeature.spec&&nums.length>=2&&!localMatch(req)&&/데이터|값|숫자|으로 바꿔|로 바꿔/.test(req)){
+    var sp=contextFeature.spec,tn=sp.template;
+    if(tn==='bar_chart'||tn==='plot'){
+      var ns=JSON.parse(JSON.stringify(sp));
+      if(tn==='bar_chart')ns.params.data=nums.slice(0,12);
+      else if(nums[0]>=1&&nums[0]<=6)ns.params.cycles=nums[0];
+      var nf=specFeature(ns,{name:contextFeature.name,description:contextFeature.description,tts_intro:'',request:req});
+      if(loadFeature(nf)){finish(nf,'[T1.5] 파라미터 즉석 수정 \u00B7 API 미사용');return;}
+    }
+  }
+
+  /* ── T2: 로컬 매칭 (오프라인) ── */
+  var m=localMatch(req);
+  if(m&&!m.needAI){
+    var spec={template:m.template,params:m.params};
+    var feat=specFeature(spec,{request:req,name:'LOCAL: '+(TEMPLATES[m.template]?m.template:'기능'),
+      description:'요청: '+req});
+    if(loadFeature(feat)){finish(feat,'[T2] 로컬 매칭(점수 '+m.score+') \u00B7 API 미사용');return;}
+  }
+
+  /* ── T3/T4: API 필요 ── */
   genBtn.disabled=true;genBtn.innerHTML='<span class="spin"></span>생성 중';
+  function done(){genBtn.disabled=false;genBtn.textContent='기능 생성';}
+
   var base=req;
-  if(contextFeature)base='[현재 로드된 기능: '+contextFeature.name+']\n'+contextFeature.code+'\n\n[사용자 요청] '+req;
+  if(contextFeature)base='[현재 로드된 기능: '+contextFeature.name+']\n'+(contextFeature.spec?JSON.stringify(contextFeature.spec):contextFeature.code)+'\n\n[사용자 요청] '+req;
   function attempt(content,retried){
     return callClaude(content).then(function(feature){
       feature.request=req;feature.id=Date.now();
@@ -874,13 +1256,29 @@ function generate(){
       throw err;
     });
   }
-  attempt(base,false).then(function(feature){
-    contextFeature=feature;
-    library=library.filter(function(f){return f.id!==feature.id;});library.unshift(feature);renderLibrary();
-    addMsg('ai','<span class="ftitle">\u2713 '+escapeHtml(feature.name)+'</span><div class="small">'+escapeHtml(feature.description||'')+'</div><div class="small">시뮬레이터에 로드됨 — 같은 칸에서 수정 요청 가능</div>');
+  function tier4(){
+    addMsg('ai','<span class="small">[T4] 새로운 메커니즘 — 코드 생성으로 진행\u2026</span>');
+    return attempt(base,false).then(function(feature){
+      finish(feature,'[T4] 코드 생성 \u00B7 같은 칸에서 수정 요청 가능');
+    });
+  }
+
+  slotFill(req,contextFeature&&contextFeature.spec?contextFeature.spec:null).then(function(res){
+    if(!res||!res.template||!TEMPLATES[res.template])return tier4();
+    var spec={template:res.template,params:res.params||{}};
+    var feat=specFeature(spec,{request:req,name:res.name||('SPEC: '+res.template),
+      description:'요청: '+req,tts_intro:res.tts_intro||''});
+    if(!loadFeature(feat))return tier4();
+    finish(feat,'[T3] AI 슬롯 채우기 \u00B7 약 1/10 토큰');
   }).catch(function(e){
-    addMsg('err','생성 실패: '+escapeHtml(e.message||'오류')+'<div class="small">GitHub Pages 등 배포 환경에서는 상단 SETUP에서 프록시 API 엔드포인트를 설정해야 합니다. 요청을 더 짧고 구체적으로 바꿔보는 것도 도움이 됩니다.</div>');
-  }).then(function(){genBtn.disabled=false;genBtn.textContent='기능 생성';});
+    // 슬롯 호출 자체가 실패(네트워크/미설정): T2 약한 매칭이라도 시도 후 안내
+    if(m&&m.needAI===true){
+      var spec={template:m.template,params:m.params};
+      var feat=specFeature(spec,{request:req,name:'LOCAL: '+m.template,description:'요청: '+req});
+      if(loadFeature(feat)){finish(feat,'[T2-약] 로컬 매칭(기본 파라미터) \u00B7 API 연결 시 내용이 채워집니다');done();return;}
+    }
+    addMsg('err','생성 실패: '+escapeHtml(e.message||'오류')+'<div class="small">SETUP에서 프록시 API 엔드포인트를 설정하면 자유 요청이 가능합니다. 오프라인에서는 칩/라이브러리와 "매출 차트 32 45 28 51" 같은 키워드+데이터 요청이 동작합니다.</div>');
+  }).then(done);
 }
 genBtn.addEventListener('click',generate);
 input.addEventListener('keydown',function(e){if((e.metaKey||e.ctrlKey)&&e.key==='Enter')generate();});
@@ -907,101 +1305,27 @@ document.getElementById('exportBtn').addEventListener('click',function(){
 });
 
 /* DEMO */
-var DEMO={id:0,name:'DEMO: 분기 매출 차트',description:'4개 분기 막대그래프. F1/팬 키 탐색, 텍스트 라인+음성 안내.',request:'(내장 데모)',
-tts_intro:'분기별 매출 차트입니다. F1 키나 팬 키로 분기를 이동하면 값을 읽어주고 텍스트 라인에 표시합니다.',
-code:["dp.clear();dp.textLine('sales q1-q4');",
-"var data=[['q1',32],['q2',45],['q3',28],['q4',51]];",
-"var base=34,bw=8,gap=5;",
-"dp.line(4,base,57,base);dp.line(4,base+1,57,base+1);",
-"for(var i=0;i<4;i++){var h=Math.round(data[i][1]/60*28);dp.rect(8+i*(bw+gap),base-h,bw,h,{fill:true});}",
-"dp.state.i=-1;",
-"function read(i){dp.textLine(data[i][0]+': '+data[i][1]);dp.speak((i+1)+'분기 매출 '+data[i][1]+'억 원');}",
-"dp.onKey(function(k){",
-" if(k==='F1'||k==='PAN_RIGHT'){dp.state.i=(dp.state.i+1)%4;read(dp.state.i);}",
-" else if(k==='PAN_LEFT'){dp.state.i=(dp.state.i+3)%4;read(dp.state.i);}",
-" else if(k==='F2'&&dp.state.i>=0){read(dp.state.i);}",
-"});"].join('\n')};
-var DICE={id:2,name:'DEMO: 주사위',description:'F1로 주사위 굴리기. 결과는 텍스트 라인+음성.',request:'(내장 데모)',
-tts_intro:'주사위 기능입니다. F1 키를 누르면 주사위를 굴리고 결과를 읽어줍니다.',
-code:["var P={1:[[1,1]],2:[[0,0],[2,2]],3:[[0,0],[1,1],[2,2]],4:[[0,0],[2,0],[0,2],[2,2]],5:[[0,0],[2,0],[1,1],[0,2],[2,2]],6:[[0,0],[2,0],[0,1],[2,1],[0,2],[2,2]]};",
-"function face(n){dp.clear();dp.rect(17,4,26,26);dp.rect(18,5,24,24);P[n].forEach(function(p){dp.rect(21+p[0]*8,8+p[1]*8,3,3,{fill:true});});}",
-"dp.state.busy=false;face(1);dp.textLine('dice: press f1');",
-"dp.onKey(function(k){if(k==='F1'&&!dp.state.busy){dp.state.busy=true;var n=1+Math.floor(Math.random()*6),i=0;",
-"var t=dp.interval(90,function(){face(1+Math.floor(Math.random()*6));if(++i>5){clearInterval(t);face(n);dp.state.busy=false;dp.textLine('dice: '+n);dp.speak('주사위 결과 '+n);}});}});"].join('\n')};
-var CLOCK={id:3,name:'DEMO: 촉각 시계',description:'아날로그 시계(그래픽) + 디지털 시각(텍스트 라인). F1 음성.',request:'(내장 데모)',
-tts_intro:'촉각 시계입니다. 그래픽 영역에 아날로그 시계, 텍스트 라인에 디지털 시각이 표시됩니다. F1 키를 누르면 시각을 읽어줍니다.',
-code:["function draw(){var d=new Date(),h=d.getHours()%12,m=d.getMinutes();",
-"dp.clear();dp.circle(30,19,17);dp.set(30,3);dp.set(46,19);dp.set(30,35);dp.set(14,19);",
-"var ma=m/60*6.2832-1.5708,ha=(h+m/60)/12*6.2832-1.5708;",
-"dp.line(30,19,30+Math.round(8*Math.cos(ha)),19+Math.round(8*Math.sin(ha)));",
-"dp.line(30,19,30+Math.round(13*Math.cos(ma)),19+Math.round(13*Math.sin(ma)));",
-"dp.textLine(('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2));}",
-"draw();dp.interval(15000,draw);",
-"dp.onKey(function(k){if(k==='F1'){var d=new Date();dp.speak('현재 시각 '+d.getHours()+'시 '+d.getMinutes()+'분');}});"].join('\n')};
-var RPS={id:4,name:'DEMO: 가위바위보',description:'F1 가위, F2 바위, F3 보. 컴퓨터 손은 그래픽, 결과는 텍스트 라인+음성.',request:'(내장 데모)',
-tts_intro:'가위바위보 게임입니다. F1은 가위, F2는 바위, F3은 보입니다. 키를 누르면 컴퓨터와 대결합니다.',
-code:["var names=['가위','바위','보'];",
-"function icon(n){dp.clear();",
-"if(n===0){dp.line(20,8,38,28);dp.line(21,8,39,28);dp.line(38,8,20,28);dp.line(39,8,21,28);}",
-"else if(n===1){dp.circle(29,18,9,{fill:true});}",
-"else{dp.rect(18,7,24,22);dp.rect(19,8,22,20);}}",
-"dp.textLine('rps: f1 f2 f3');",
-"dp.onKey(function(k){var me={'F1':0,'F2':1,'F3':2}[k];if(me===undefined)return;",
-"var cpu=Math.floor(Math.random()*3);icon(cpu);",
-"var r=(me-cpu+3)%3,txt=r===0?'draw':(r===1?'win':'lose');",
-"dp.textLine(txt);",
-"dp.speak('컴퓨터는 '+names[cpu]+'. '+(r===0?'무승부':(r===1?'당신의 승리':'당신의 패배')));});"].join('\n')};
-var MAZE={id:5,name:'DEMO: 미로 탈출',description:'F1 위, F4 아래, 팬 키 좌우. 우하단 출구까지 이동.',request:'(내장 데모)',
-tts_intro:'미로 탈출 게임입니다. F1은 위, F4는 아래, 팬 키는 좌우 이동입니다. 오른쪽 아래 출구를 찾으세요.',
-code:["var walls=[[0,0,60,2],[0,38,52,2],[0,0,2,40],[58,0,2,30],",
-"[10,2,2,26],[18,12,2,28],[28,2,2,26],[38,12,2,28],[48,2,2,20]];",
-"dp.state.x=4;dp.state.y=4;",
-"function hit(x,y){if(x<2||y<2||x>57||y>37)return!(x>=52&&y>=33);",
-"for(var i=0;i<walls.length;i++){var w=walls[i];if(x+1>=w[0]&&x<w[0]+w[2]&&y+1>=w[1]&&y<w[1]+w[3])return true;}return false;}",
-"function draw(){dp.clear();walls.forEach(function(w){dp.rect(w[0],w[1],w[2],w[3],{fill:true});});",
-"dp.rect(dp.state.x,dp.state.y,2,2,{fill:true});}",
-"draw();dp.textLine('maze: find exit');",
-"dp.onKey(function(k){var dx=0,dy=0;",
-"if(k==='F1')dy=-2;else if(k==='F4')dy=2;else if(k==='PAN_LEFT')dx=-2;else if(k==='PAN_RIGHT')dx=2;else return;",
-"var nx=dp.state.x+dx,ny=dp.state.y+dy;",
-"if(nx>=56&&ny>=32){dp.state.x=nx;dp.state.y=ny;draw();dp.textLine('escape!');dp.speak('탈출 성공! 축하합니다.');return;}",
-"if(hit(nx,ny)){dp.speak('벽입니다');return;}",
-"dp.state.x=nx;dp.state.y=ny;draw();});"].join('\n')};
-var SINE={id:6,name:'DEMO: 사인 곡선',description:'F1로 주기 변경(1~3). 텍스트 라인에 현재 주기 표시.',request:'(내장 데모)',
-tts_intro:'사인 곡선 그래프입니다. F1 키를 누르면 주기가 1에서 3 사이로 바뀝니다.',
-code:["function draw(f){dp.clear();dp.line(0,20,59,20);dp.line(2,2,2,38);",
-"for(var x=3;x<60;x++){var y=20-Math.round(15*Math.sin((x-3)/56*6.2832*f));dp.set(x,y);dp.set(x,y+(y<20?1:-1));}",
-"dp.textLine('sine x'+f);}",
-"dp.state.f=1;draw(1);",
-"dp.onKey(function(k){if(k==='F1'){dp.state.f=dp.state.f%3+1;draw(dp.state.f);dp.speak('주기 '+dp.state.f);}});"].join('\n')};
-var LIVE={id:7,name:'DEMO: 라이브 점자 자막',description:'마이크로 말하면 그래픽 영역에 멀티라인 점자 자막이 실시간 표시. F1 지우기, F2 일시정지/재개.',request:'(내장 데모)',
-tts_intro:'라이브 점자 자막입니다. 지금부터 말하면 그래픽 영역에 점자로 실시간 표시됩니다. 화면이 차면 자동으로 넘어갑니다. F1은 지우기, F2는 일시정지와 재개입니다.',
-code:["var PER=20,LINES=8,GAPY=5,POS={1:[0,0],2:[0,1],3:[0,2],4:[1,0],5:[1,1],6:[1,2]};",
-"dp.state.txt='';dp.state.tmp='';dp.state.on=true;",
-"function render(){",
-" var cells=dp.brailleCells(dp.state.txt+dp.state.tmp),max=PER*LINES,off=0;",
-" if(cells.length>max)off=Math.ceil((cells.length-max)/PER)*PER;",
-" dp.clear();",
-" for(var i=off;i<cells.length;i++){",
-"  var n=i-off,x=(n%PER)*3,y=Math.floor(n/PER)*GAPY,dots=cells[i];",
-"  for(var d=0;d<dots.length;d++){var p=POS[dots[d]];dp.set(x+p[0],y+p[1]);}",
-" }",
-"}",
-"dp.state._rt=0;",
-"function requestRender(){",
-" if(dp.state._rt)return;",
-" dp.state._rt=dp.timeout(120,function(){dp.state._rt=0;render();});",
-"}",
-"dp.textLine('live caption');render();",
-"dp.listen(function(t,fin){",
-" if(!dp.state.on)return;",
-" if(fin){dp.state.txt+=t+' ';dp.state.tmp='';}else{dp.state.tmp=t;}",
-" requestRender();",
-"});",
-"dp.onKey(function(k){",
-" if(k==='F1'){dp.state.txt='';dp.state.tmp='';render();dp.speak('자막을 지웠습니다');}",
-" else if(k==='F2'){dp.state.on=!dp.state.on;dp.textLine(dp.state.on?'live caption':'paused');dp.speak(dp.state.on?'자막 재개':'자막 일시정지');}",
-"});"].join('\n')};
+var DEMO=specFeature({template:'bar_chart',params:{title:'sales q1-q4',data:[32,45,28,51],labels:['q1','q2','q3','q4'],unit:'억 원'}},
+ {id:0,name:'DEMO: 분기 매출 차트',description:'4개 분기 막대그래프. F1/팬 키 탐색, 텍스트 라인+음성 안내.',request:'(내장 데모)',
+  tts_intro:'분기별 매출 차트입니다. F1 키나 팬 키로 분기를 이동하면 값을 읽어주고 텍스트 라인에 표시합니다.'});
+var DICE=specFeature({template:'dice',params:{}},
+ {id:2,name:'DEMO: 주사위',description:'F1로 주사위 굴리기. 결과는 텍스트 라인+음성.',request:'(내장 데모)',
+  tts_intro:'주사위 기능입니다. F1 키를 누르면 주사위를 굴리고 결과를 읽어줍니다.'});
+var CLOCK=specFeature({template:'clock',params:{}},
+ {id:3,name:'DEMO: 촉각 시계',description:'아날로그 시계(그래픽) + 디지털 시각(텍스트 라인). F1 음성.',request:'(내장 데모)',
+  tts_intro:'촉각 시계입니다. 그래픽 영역에 아날로그 시계, 텍스트 라인에 디지털 시각이 표시됩니다. F1 키를 누르면 시각을 읽어줍니다.'});
+var RPS=specFeature({template:'rps',params:{}},
+ {id:4,name:'DEMO: 가위바위보',description:'F1 가위, F2 바위, F3 보. 컴퓨터 손은 그래픽, 결과는 텍스트 라인+음성.',request:'(내장 데모)',
+  tts_intro:'가위바위보 게임입니다. F1은 가위, F2는 바위, F3은 보입니다. 키를 누르면 컴퓨터와 대결합니다.'});
+var MAZE=specFeature({template:'maze',params:{}},
+ {id:5,name:'DEMO: 미로 탈출',description:'F1 위, F4 아래, 팬 키 좌우. 우하단 출구까지 이동.',request:'(내장 데모)',
+  tts_intro:'미로 탈출 게임입니다. F1은 위, F4는 아래, 팬 키는 좌우 이동입니다. 오른쪽 아래 출구를 찾으세요.'});
+var SINE=specFeature({template:'plot',params:{fn:'sin'}},
+ {id:6,name:'DEMO: 사인 곡선',description:'F1로 주기 변경(1~6). 텍스트 라인에 현재 주기 표시.',request:'(내장 데모)',
+  tts_intro:'사인 곡선 그래프입니다. F1 키를 누르면 주기가 바뀝니다.'});
+var LIVE=specFeature({template:'caption',params:{}},
+ {id:7,name:'DEMO: 라이브 점자 자막',description:'마이크로 말하면 그래픽 영역에 멀티라인 점자 자막이 실시간 표시. F1 지우기, F2 일시정지/재개.',request:'(내장 데모)',
+  tts_intro:'라이브 점자 자막입니다. 지금부터 말하면 그래픽 영역에 점자로 실시간 표시됩니다. 화면이 차면 자동으로 넘어갑니다. F1은 지우기, F2는 일시정지와 재개입니다.'});
 library.push(DEMO);library.push(DICE);library.push(CLOCK);library.push(RPS);library.push(MAZE);library.push(SINE);library.push(LIVE);
 loadFeature(DEMO,false);renderLibrary();
 
