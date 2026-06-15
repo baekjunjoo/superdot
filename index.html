@@ -60,7 +60,7 @@
   #hero{position:absolute;inset:0;width:100%;height:100%;display:block}
   .hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,.15) 38%,rgba(0,0,0,.7) 100%);pointer-events:none}
   .hero-inner{position:relative;z-index:2;padding:0 30px 64px;width:100%}
-  .eyebrow{font-size:12px;font-weight:600;letter-spacing:.28em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:18px}
+  .eyebrow{font-size:clamp(15px,2vw,20px);font-weight:800;letter-spacing:.04em;color:var(--ink);margin-bottom:14px}
   .hero h1{font-weight:800;text-transform:uppercase;font-size:clamp(38px,7.5vw,96px);line-height:.92;letter-spacing:.02em}
   .hero .sub{margin-top:22px;max-width:620px;font-size:14px;font-weight:400;letter-spacing:.04em;color:#D2D2D2;line-height:1.65}
   .hero-cta{margin-top:30px;display:flex;gap:14px;flex-wrap:wrap}
@@ -214,91 +214,92 @@
 </style>
 </head>
 <body>
-<a class="skip" href="#main">본문 바로가기 — 기능 생성</a>
+<a class="skip" href="#main" data-i18n="skip">본문 바로가기 — 기능 생성</a>
 
 <nav id="nav">
   <div class="wordmark">SUPER&nbsp;DOT</div>
   <div class="navlinks">
-    <a href="#build">BUILD</a>
-    <a href="#simulator">SIMULATOR</a>
-    <a href="#console">CONSOLE</a>
+    <a href="#build" data-i18n="nav.build">BUILD</a>
+    <a href="#simulator" data-i18n="nav.sim">SIMULATOR</a>
+    <a href="#console" data-i18n="nav.console">CONSOLE</a>
   </div>
   <div class="navstatus">
     <span>60 &times; 40 BINARY</span>
     <span class="live" id="modeBadge">SIMULATOR</span>
-    <button class="navbtn" id="bleBtn">BLE CONNECT</button>
-    <button class="navbtn" id="setBtn" title="API / BLE 설정">SETUP</button>
+    <button class="navbtn" id="bleBtn" data-i18n="nav.ble">BLE CONNECT</button>
+    <button class="navbtn" id="setBtn" title="API / BLE 설정" data-i18n="nav.setup">SETUP</button>
+    <button class="navbtn" id="langBtn" title="Language / 언어" aria-label="Language">EN</button>
   </div>
 </nav>
 
 <header class="hero">
   <canvas id="hero" aria-hidden="true"></canvas>
   <div class="hero-inner">
-    <div class="eyebrow">NATURAL LANGUAGE &rarr; TACTILE FEATURE</div>
+    <div class="eyebrow" data-i18n="hero.eyebrow">생각한 것을, 지금 바로.</div>
     <h1>SUPER DOT</h1>
-    <p class="sub">현장에서 고객이 원하는 기능을 말로 입력하면, DotPad에서 작동 가능한 범위 안에서 즉시 기능이 구현됩니다. 사용자 테스트를 기다리지 않고 그 자리에서 시연하기 위한 도구입니다.</p>
+    <p class="sub" data-i18n="hero.sub">원하는 기능을 입력하면, DotPad가 그 자리에서 보여줍니다. 기다림도, "검토해보겠습니다"도 없이.</p>
     <div class="hero-cta">
-      <a class="btn solid" href="#build">기능 생성하기</a>
-      <a class="btn" href="#simulator">시뮬레이터 보기</a>
+      <a class="btn solid" href="#build" data-i18n="hero.cta1">기능 생성하기</a>
+      <a class="btn" href="#simulator" data-i18n="hero.cta2">시뮬레이터 보기</a>
     </div>
   </div>
-  <div class="scrollcue">SCROLL &darr;</div>
+  <div class="scrollcue" data-i18n="hero.scroll">SCROLL &darr;</div>
 </header>
 
 <main id="main">
 <section class="section" id="process">
   <div class="section-head">
     <span class="section-num">01</span>
-    <h2 class="section-title">Process</h2>
-    <span class="section-desc">사용자 테스트 사이클을 기다리지 않고, 고객 피드백이 그 자리에서 작동하는 기능이 됩니다.</span>
+    <h2 class="section-title" data-i18n="proc.title">Process</h2>
+    <span class="section-desc" data-i18n="proc.desc">사용자 테스트 사이클을 기다리지 않고, 고객 피드백이 그 자리에서 작동하는 기능이 됩니다.</span>
   </div>
   <div class="steps">
-    <div class="step"><div class="step-n">A</div><div class="step-t step-doto">Listen</div><p>고객이 원하는 기능을 자연어로 입력합니다 — 텍스트 또는 음성으로.</p></div>
-    <div class="step"><div class="step-n">B</div><div class="step-t step-doto">Generate</div><p>AI가 DotPad가 표현 가능한 범위 안에서만 기능을 즉시 구현합니다.</p></div>
-    <div class="step"><div class="step-n">C</div><div class="step-t step-doto">Touch</div><p>시뮬레이터와 실기기에 동시 출력되고, 닷패드 하드웨어 키로 직접 조작합니다.</p></div>
+    <div class="step"><div class="step-n">A</div><div class="step-t step-doto" data-i18n="proc.a.t">Listen</div><p data-i18n="proc.a.p">고객이 원하는 기능을 자연어로 입력합니다 — 텍스트 또는 음성으로.</p></div>
+    <div class="step"><div class="step-n">B</div><div class="step-t step-doto" data-i18n="proc.b.t">Generate</div><p data-i18n="proc.b.p">AI가 DotPad가 표현 가능한 범위 안에서만 기능을 즉시 구현합니다.</p></div>
+    <div class="step"><div class="step-n">C</div><div class="step-t step-doto" data-i18n="proc.c.t">Touch</div><p data-i18n="proc.c.p">시뮬레이터와 실기기에 동시 출력되고, 닷패드 하드웨어 키로 직접 조작합니다.</p></div>
   </div>
 </section>
 
 <section class="section" id="build">
   <div class="section-head">
     <span class="section-num">02</span>
-    <h2 class="section-title">Feature Builder</h2>
-    <span class="section-desc">자연어 요청을 DotPad 런타임 코드로 변환합니다. 출력은 항상 60&times;40 이진 디스플레이가 표현 가능한 범위로 제한됩니다.</span>
+    <h2 class="section-title" data-i18n="build.title">Feature Builder</h2>
+    <span class="section-desc" data-i18n="build.desc">자연어 요청을 DotPad 런타임 코드로 변환합니다. 출력은 항상 60&times;40 이진 디스플레이가 표현 가능한 범위로 제한됩니다.</span>
   </div>
   <div class="grid">
     <div class="col-left">
       <div class="block">
-        <div class="block-head"><span>NATURAL LANGUAGE INPUT</span></div>
+        <div class="block-head"><span data-i18n="build.nli">NATURAL LANGUAGE INPUT</span></div>
         <div id="chatLog">
-          <div class="msg ai"><span class="ftitle">SUPER DOT</span><br>고객이 원하는 기능을 말로 입력하면 DotPad에서 바로 작동하는 기능을 생성합니다.<div class="small">예: "이번 분기 매출을 막대그래프로" &middot; "주사위 굴리기" &middot; "현재 시각을 점자로" &middot; "간단한 미로 게임"</div></div>
+          <div class="msg ai"><span class="ftitle">SUPER DOT</span><br><span data-i18n="build.greet">원하는 기능을 입력하면 DotPad에서 바로 작동하는 기능을 생성합니다.</span><div class="small" data-i18n="build.greetEx">예: "이번 분기 매출을 막대그래프로" &middot; "주사위 굴리기" &middot; "현재 시각을 점자로" &middot; "간단한 미로 게임"</div></div>
         </div>
         <div class="inputArea">
-          <textarea id="input" aria-label="기능 요청 입력" placeholder="고객이 원하는 기능을 자연어로 입력...  (생성 후 같은 칸에서 수정 요청 가능: '막대를 더 두껍게')"></textarea>
+          <textarea id="input" aria-label="기능 요청 입력" data-i18n-ph="build.ph" placeholder="고객이 원하는 기능을 자연어로 입력...  (생성 후 같은 칸에서 수정 요청 가능: '막대를 더 두껍게')"></textarea>
           <div class="row">
-            <button class="btn solid actbtn" id="genBtn">기능 생성</button>
-            <button class="btn actbtn" id="newBtn" title="현재 기능 맥락 초기화">새 맥락</button>
+            <button class="btn solid actbtn" id="genBtn" data-i18n="build.gen">기능 생성</button>
+            <button class="btn actbtn" id="newBtn" title="현재 기능 맥락 초기화" data-i18n="build.new">새 맥락</button>
             <button class="btn actbtn" id="micBtn" title="음성으로 입력 (ko-KR)">MIC</button>
             <span class="hint" style="margin-left:auto">&#8984;/CTRL+ENTER</span>
           </div>
           <div class="chips" id="chips">
-            <button class="chip">분기별 매출 막대 차트</button>
-            <button class="chip">주사위 굴리기</button>
-            <button class="chip">현재 시각을 점자로</button>
-            <button class="chip">가위바위보 게임</button>
-            <button class="chip">간단한 미로 게임</button>
-            <button class="chip">사인 곡선 그래프</button>
-            <button class="chip">라이브 점자 자막</button>
+            <button class="chip" data-ko="분기별 매출 막대 차트" data-en="Quarterly sales bar chart">분기별 매출 막대 차트</button>
+            <button class="chip" data-ko="주사위 굴리기" data-en="Roll a dice">주사위 굴리기</button>
+            <button class="chip" data-ko="현재 시각을 점자로" data-en="Current time in braille">현재 시각을 점자로</button>
+            <button class="chip" data-ko="가위바위보 게임" data-en="Rock paper scissors">가위바위보 게임</button>
+            <button class="chip" data-ko="간단한 미로 게임" data-en="Simple maze game">간단한 미로 게임</button>
+            <button class="chip" data-ko="사인 곡선 그래프" data-en="Sine wave graph">사인 곡선 그래프</button>
+            <button class="chip" data-ko="라이브 점자 자막" data-en="Live braille caption">라이브 점자 자막</button>
           </div>
         </div>
       </div>
       <div class="block">
-        <div class="block-head"><span>FEATURE LIBRARY</span><span style="display:flex;gap:8px"><button class="btn" id="importBtn" style="padding:5px 12px;font-size:10px">IMPORT</button><button class="btn" id="exportBtn" style="padding:5px 12px;font-size:10px">EXPORT</button></span></div>
-        <div id="library"><div class="empty">데모 기능이 시뮬레이터에 로드됨</div></div>
+        <div class="block-head"><span data-i18n="lib.title">FEATURE LIBRARY</span><span style="display:flex;gap:8px"><button class="btn" id="importBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.import">IMPORT</button><button class="btn" id="exportBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.export">EXPORT</button></span></div>
+        <div id="library"><div class="empty" data-i18n="lib.empty">데모 기능이 시뮬레이터에 로드됨</div></div>
       </div>
     </div>
     <div class="col-right">
       <div class="block" id="simulator">
-        <div class="block-head"><span>DOT PAD SIMULATOR &mdash; 60 &times; 40</span><button class="btn" id="syncBtn" style="padding:5px 12px;font-size:10px" title="시뮬레이터-실기기 정렬 검증 패턴">SYNC TEST</button></div>
+        <div class="block-head"><span>DOT PAD SIMULATOR &mdash; 60 &times; 40</span><button class="btn" id="syncBtn" style="padding:5px 12px;font-size:10px" title="시뮬레이터-실기기 정렬 검증 패턴" data-i18n="sim.sync">SYNC TEST</button></div>
         <div class="deviceWrap">
           <div class="device">
             <div class="deviceHead"><span class="lbl">DOT PAD</span><span id="featureName">&mdash;</span></div>
@@ -315,9 +316,9 @@
         </div>
       </div>
       <div class="block" id="console">
-        <div class="block-head"><span>TTS &middot; EVENT CONSOLE</span><button class="btn" id="ttsBtn" style="padding:5px 12px;font-size:10px" title="음성 출력 켜기/끄기">TTS ON</button></div>
+        <div class="block-head"><span data-i18n="con.title">TTS &middot; EVENT CONSOLE</span><button class="btn" id="ttsBtn" style="padding:5px 12px;font-size:10px" title="음성 출력 켜기/끄기">TTS ON</button></div>
         <div id="ttsLog" aria-live="polite"></div>
-        <details id="codeBox" hidden><summary>VIEW RUNTIME CODE</summary><pre id="codeView"></pre></details>
+        <details id="codeBox" hidden><summary data-i18n="con.code">VIEW RUNTIME CODE</summary><pre id="codeView"></pre></details>
       </div>
     </div>
   </div>
@@ -1797,6 +1798,67 @@ library.push(DEMO);library.push(DICE);library.push(CLOCK);library.push(RPS);libr
 loadFeature(DEMO,false);renderLibrary();
 
 /* ═══════════ DEPLOY EDITION: SETTINGS ═══════════ */
+/* ══════════ i18n — 한/영 토글 (해외 시연팀용) ══════════ */
+var I18N={
+ ko:{
+  'skip':'본문 바로가기 — 기능 생성',
+  'nav.build':'BUILD','nav.sim':'SIMULATOR','nav.console':'CONSOLE','nav.ble':'BLE 연결','nav.setup':'설정',
+  'hero.eyebrow':'생각한 것을, 지금 바로.',
+  'hero.sub':'원하는 기능을 입력하면, DotPad가 그 자리에서 보여줍니다. 기다림도, "검토해보겠습니다"도 없이.',
+  'hero.cta1':'기능 생성하기','hero.cta2':'시뮬레이터 보기','hero.scroll':'스크롤 &darr;',
+  'proc.title':'과정','proc.desc':'사용자 테스트 사이클을 기다리지 않고, 고객 피드백이 그 자리에서 작동하는 기능이 됩니다.',
+  'proc.a.t':'듣기','proc.a.p':'원하는 기능을 자연어로 입력합니다 — 텍스트 또는 음성으로.',
+  'proc.b.t':'생성','proc.b.p':'AI가 DotPad가 표현 가능한 범위 안에서만 기능을 즉시 구현합니다.',
+  'proc.c.t':'터치','proc.c.p':'시뮬레이터와 실기기에 동시 출력되고, 닷패드 하드웨어 키로 직접 조작합니다.',
+  'build.title':'기능 빌더','build.desc':'자연어 요청을 DotPad 런타임 코드로 변환합니다. 출력은 항상 60&times;40 이진 디스플레이가 표현 가능한 범위로 제한됩니다.',
+  'build.nli':'자연어 입력',
+  'build.greet':'원하는 기능을 입력하면 DotPad에서 바로 작동하는 기능을 생성합니다.',
+  'build.greetEx':'예: "이번 분기 매출을 막대그래프로" &middot; "주사위 굴리기" &middot; "현재 시각을 점자로" &middot; "간단한 미로 게임"',
+  'build.ph':"원하는 기능을 자연어로 입력...  (생성 후 같은 칸에서 수정 요청 가능: '막대를 더 두껍게')",
+  'build.gen':'기능 생성','build.new':'새 맥락',
+  'lib.title':'기능 라이브러리','lib.import':'가져오기','lib.export':'내보내기','lib.empty':'데모 기능이 시뮬레이터에 로드됨',
+  'sim.sync':'정렬 테스트','con.title':'TTS · 이벤트 콘솔','con.tts':'TTS 켜짐','con.code':'런타임 코드 보기'
+ },
+ en:{
+  'skip':'Skip to main — Feature Builder',
+  'nav.build':'BUILD','nav.sim':'SIMULATOR','nav.console':'CONSOLE','nav.ble':'BLE CONNECT','nav.setup':'SETUP',
+  'hero.eyebrow':'What you imagine, right now.',
+  'hero.sub':'Type the feature you want, and DotPad shows it on the spot. No waiting, no "we&rsquo;ll look into it."',
+  'hero.cta1':'Build a feature','hero.cta2':'Open simulator','hero.scroll':'SCROLL &darr;',
+  'proc.title':'Process','proc.desc':'No waiting for the next user-testing cycle — feedback becomes a working feature on the spot.',
+  'proc.a.t':'Listen','proc.a.p':'Type the feature you want in plain language — by text or voice.',
+  'proc.b.t':'Generate','proc.b.p':'AI builds it instantly, only within what DotPad can render.',
+  'proc.c.t':'Touch','proc.c.p':'Output goes to the simulator and the real device at once — drive it with the hardware keys.',
+  'build.title':'Feature Builder','build.desc':'Turns a natural-language request into DotPad runtime code. Output is always limited to what the 60&times;40 binary display can show.',
+  'build.nli':'NATURAL LANGUAGE INPUT',
+  'build.greet':'Type the feature you want, and a working DotPad feature is generated instantly.',
+  'build.greetEx':'e.g. "quarterly sales as a bar chart" · "roll a dice" · "current time in braille" · "a simple maze game"',
+  'build.ph':"Type the feature you want in plain language...  (after generating, refine in the same box: 'make the bars thicker')",
+  'build.gen':'Generate','build.new':'New context',
+  'lib.title':'FEATURE LIBRARY','lib.import':'IMPORT','lib.export':'EXPORT','lib.empty':'Demo feature loaded in the simulator',
+  'sim.sync':'SYNC TEST','con.title':'TTS · EVENT CONSOLE','con.tts':'TTS ON','con.code':'VIEW RUNTIME CODE'
+ }
+};
+var LANG=(function(){try{return localStorage.getItem('sd_lang')||'ko';}catch(e){return 'ko';}})();
+function t(key){var d=I18N[LANG]||I18N.ko;return d[key]!=null?d[key]:(I18N.ko[key]!=null?I18N.ko[key]:key);}
+function applyLang(){
+  var d=I18N[LANG]||I18N.ko;
+  document.querySelectorAll('[data-i18n]').forEach(function(el){var k=el.getAttribute('data-i18n');if(d[k]!=null)el.innerHTML=d[k];});
+  document.querySelectorAll('[data-i18n-ph]').forEach(function(el){var k=el.getAttribute('data-i18n-ph');if(d[k]!=null)el.setAttribute('placeholder',d[k]);});
+  document.querySelectorAll('.chip[data-ko]').forEach(function(c){c.textContent=(LANG==='en'?c.getAttribute('data-en'):c.getAttribute('data-ko'));});
+  document.documentElement.lang=LANG;
+  var lb=document.getElementById('langBtn');if(lb)lb.textContent=(LANG==='en'?'KO':'EN');
+  // TTS 버튼 상태 텍스트가 켜짐/꺼짐을 반영 중이면 현재 상태 유지하며 언어만 교체
+}
+function setLang(l){LANG=l;try{localStorage.setItem('sd_lang',l);}catch(e){}applyLang();}
+function initLang(){
+  applyLang();
+  var lb=document.getElementById('langBtn');
+  if(lb&&!lb._bound){lb._bound=true;lb.addEventListener('click',function(){setLang(LANG==='en'?'ko':'en');});}
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initLang);
+else initLang();
+
 var SD={
   cfg:(function(){try{return JSON.parse(localStorage.getItem('sd_cfg')||'{}');}catch(e){return{};}})(),
   save:function(){try{localStorage.setItem('sd_cfg',JSON.stringify(SD.cfg));}catch(e){}},
@@ -2227,12 +2289,13 @@ document.getElementById('syncBtn').addEventListener('click',function(){
   var chips=document.querySelectorAll('#chips .chip');
   for(var i=0;i<chips.length;i++){(function(ch){
     ch.addEventListener('click',function(){
-      var f=builtin[ch.textContent];
+      var ko=ch.getAttribute('data-ko')||ch.textContent;
+      var f=builtin[ko];
       if(f){
         loadFeature(f);contextFeature=f;
-        addMsg('ai','<span class="ftitle">\u25B8 '+escapeHtml(f.name)+'</span><div class="small">내장 데모 — API 연결 없이 동작. 수정하려면 자연어로 요청하세요.</div>');
+        addMsg('ai','<span class="ftitle">\u25B8 '+escapeHtml(f.name)+'</span><div class="small">'+(LANG==='en'?'Built-in demo — runs without an API connection. Refine it in natural language.':'내장 데모 — API 연결 없이 동작. 수정하려면 자연어로 요청하세요.')+'</div>');
       }else{
-        input.value=ch.textContent+' 기능 만들어줘';input.focus();
+        input.value=ko+' 기능 만들어줘';input.focus();
       }
     });
   })(chips[i]);}
