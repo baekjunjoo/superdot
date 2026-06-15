@@ -1705,8 +1705,8 @@ function generate(){
   }
 
   /* ── T3/T4: API 필요 ── */
-  genBtn.disabled=true;genBtn.innerHTML='<span class="spin"></span>생성 중';
-  function done(){genBtn.disabled=false;genBtn.textContent='기능 생성';}
+  genBtn.disabled=true;genBtn.innerHTML='<span class="spin"></span>'+t('dyn.generating');
+  function done(){genBtn.disabled=false;genBtn.textContent=t('dyn.genbtn');}
 
   var base=req;
   if(contextFeature)base='[현재 로드된 기능: '+contextFeature.name+']\n'+(contextFeature.spec?JSON.stringify(contextFeature.spec):contextFeature.code)+'\n\n[사용자 요청] '+req;
@@ -1717,7 +1717,7 @@ function generate(){
       return feature;
     }).catch(function(err){
       if(!retried){
-        addMsg('ai','<span class="small">1차 시도 실패('+escapeHtml(err.message||'오류')+') — 더 단순한 버전으로 자동 재시도 중\u2026</span>');
+        addMsg('ai','<span class="small">'+t('dyn.retry')+' ('+escapeHtml(err.message||'')+')</span>');
         var fix=content+'\n\n[시스템] 직전 시도가 실패했습니다: '+(err.message||'오류')+'. 기능을 더 단순화하고 훨씬 짧은 코드로, 유효한 JSON 하나만 출력하세요.';
         return attempt(fix,true);
       }
@@ -1725,7 +1725,7 @@ function generate(){
     });
   }
   function tier4(){
-    addMsg('ai','<span class="small">[T4] 새로운 메커니즘 — 코드 생성으로 진행\u2026</span>');
+    addMsg('ai','<span class="small">'+t('dyn.t4')+'</span>');
     return attempt(base,false).then(function(feature){
       finish(feature,'[T4] 코드 생성 \u00B7 같은 칸에서 수정 요청 가능');
     });
@@ -1745,17 +1745,17 @@ function generate(){
       var feat=specFeature(spec,{request:req,name:'LOCAL: '+m.template,description:'요청: '+req});
       if(loadFeature(feat)){finish(feat,'[T2-약] 로컬 매칭(기본 파라미터) \u00B7 API 연결 시 내용이 채워집니다');done();return;}
     }
-    addMsg('err','생성 실패: '+escapeHtml(e.message||'오류')+'<div class="small">SETUP에서 프록시 API 엔드포인트를 설정하면 자유 요청이 가능합니다. 오프라인에서는 칩/라이브러리와 "매출 차트 32 45 28 51" 같은 키워드+데이터 요청이 동작합니다.</div>');
+    addMsg('err',t('dyn.genfail')+': '+escapeHtml(e.message||'')+'<div class="small">'+t('dyn.genfailDesc')+'</div>');
   }).then(done);
 }
 genBtn.addEventListener('click',generate);
 input.addEventListener('keydown',function(e){if((e.metaKey||e.ctrlKey)&&e.key==='Enter')generate();});
-newBtn.addEventListener('click',function(){contextFeature=null;addMsg('ai','맥락을 초기화했습니다. 새 기능을 요청하세요.');});
+newBtn.addEventListener('click',function(){contextFeature=null;addMsg('ai',t('dyn.ctxreset'));});
 
 /* LIBRARY */
 var library=[],libraryEl=document.getElementById('library');
 function renderLibrary(){
-  if(!library.length){libraryEl.innerHTML='<div class="empty">생성된 기능 없음</div>';return;}
+  if(!library.length){libraryEl.innerHTML='<div class="empty">'+t('dyn.libempty')+'</div>';return;}
   libraryEl.innerHTML='';
   library.forEach(function(f){
     var item=document.createElement('div');
@@ -1768,8 +1768,8 @@ function renderLibrary(){
 }
 document.getElementById('exportBtn').addEventListener('click',function(){
   var json=JSON.stringify(library,null,2);
-  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(json).then(function(){addMsg('ai','라이브러리 JSON 복사됨 ('+library.length+'개 기능).');}).catch(function(){codeView.textContent=json;codeBox.hidden=false;codeBox.open=true;addMsg('ai','클립보드 접근 실패 — 코드 보기에서 수동 복사하세요.');});}
-  else{codeView.textContent=json;codeBox.hidden=false;codeBox.open=true;addMsg('ai','코드 보기에서 수동 복사하세요.');}
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(json).then(function(){addMsg('ai',t('dyn.exportedPre')+library.length+t('dyn.exported'));}).catch(function(){codeView.textContent=json;codeBox.hidden=false;codeBox.open=true;addMsg('ai',t('dyn.copyfail'));});}
+  else{codeView.textContent=json;codeBox.hidden=false;codeBox.open=true;addMsg('ai',t('dyn.copyfail'));}
 });
 
 /* DEMO */
@@ -1817,7 +1817,18 @@ var I18N={
   'build.ph':"원하는 기능을 자연어로 입력...  (생성 후 같은 칸에서 수정 요청 가능: '막대를 더 두껍게')",
   'build.gen':'기능 생성','build.new':'새 맥락',
   'lib.title':'기능 라이브러리','lib.import':'가져오기','lib.export':'내보내기','lib.empty':'데모 기능이 시뮬레이터에 로드됨',
-  'sim.sync':'정렬 테스트','con.title':'TTS · 이벤트 콘솔','con.tts':'TTS 켜짐','con.code':'런타임 코드 보기'
+  'sim.sync':'정렬 테스트','con.title':'TTS · 이벤트 콘솔','con.tts':'TTS 켜짐','con.code':'런타임 코드 보기',
+  'dyn.demo':'내장 데모 — API 연결 없이 동작. 수정하려면 자연어로 요청하세요.',
+  'dyn.retry':'1차 시도 실패 — 더 단순한 버전으로 자동 재시도 중…',
+  'dyn.t4':'[T4] 새로운 메커니즘 — 코드 생성으로 진행…',
+  'dyn.genfail':'생성 실패','dyn.genfailDesc':'SETUP에서 프록시 API 엔드포인트를 설정하면 자유 요청이 가능합니다. 오프라인에서는 칩/라이브러리와 "매출 차트 32 45 28 51" 같은 키워드+데이터 요청이 동작합니다.',
+  'dyn.ctxreset':'맥락을 초기화했습니다. 새 기능을 요청하세요.',
+  'dyn.libempty':'생성된 기능 없음','dyn.libloaded':'데모 기능이 시뮬레이터에 로드됨',
+  'dyn.exported':'개 기능).','dyn.exportedPre':'라이브러리 JSON 복사됨 (',
+  'dyn.copyfail':'클립보드 접근 실패 — 코드 보기에서 수동 복사하세요.',
+  'dyn.imported':'개 기능을 가져왔습니다.','dyn.importedPre':'라이브러리에 ',
+  'dyn.importfail':'가져오기 실패: ',
+  'dyn.generating':'생성 중','dyn.genbtn':'기능 생성'
  },
  en:{
   'skip':'Skip to main — Feature Builder',
@@ -1836,7 +1847,18 @@ var I18N={
   'build.ph':"Type the feature you want in plain language...  (after generating, refine in the same box: 'make the bars thicker')",
   'build.gen':'Generate','build.new':'New context',
   'lib.title':'FEATURE LIBRARY','lib.import':'IMPORT','lib.export':'EXPORT','lib.empty':'Demo feature loaded in the simulator',
-  'sim.sync':'SYNC TEST','con.title':'TTS · EVENT CONSOLE','con.tts':'TTS ON','con.code':'VIEW RUNTIME CODE'
+  'sim.sync':'SYNC TEST','con.title':'TTS · EVENT CONSOLE','con.tts':'TTS ON','con.code':'VIEW RUNTIME CODE',
+  'dyn.demo':'Built-in demo — runs without an API connection. Refine it in natural language.',
+  'dyn.retry':'First attempt failed — automatically retrying with a simpler version…',
+  'dyn.t4':'[T4] New mechanism — proceeding with code generation…',
+  'dyn.genfail':'Generation failed','dyn.genfailDesc':'Set a proxy API endpoint in SETUP to enable free-form requests. Offline, the chips/library and keyword+data requests like "sales chart 32 45 28 51" still work.',
+  'dyn.ctxreset':'Context cleared. Request a new feature.',
+  'dyn.libempty':'No generated features','dyn.libloaded':'Demo feature loaded in the simulator',
+  'dyn.exported':' features).','dyn.exportedPre':'Library JSON copied (',
+  'dyn.copyfail':'Clipboard access failed — copy manually from the code view.',
+  'dyn.imported':' features.','dyn.importedPre':'Imported ',
+  'dyn.importfail':'Import failed: ',
+  'dyn.generating':'Generating','dyn.genbtn':'Generate'
  }
 };
 var LANG=(function(){try{return localStorage.getItem('sd_lang')||'ko';}catch(e){return 'ko';}})();
@@ -2293,7 +2315,7 @@ document.getElementById('syncBtn').addEventListener('click',function(){
       var f=builtin[ko];
       if(f){
         loadFeature(f);contextFeature=f;
-        addMsg('ai','<span class="ftitle">\u25B8 '+escapeHtml(f.name)+'</span><div class="small">'+(LANG==='en'?'Built-in demo — runs without an API connection. Refine it in natural language.':'내장 데모 — API 연결 없이 동작. 수정하려면 자연어로 요청하세요.')+'</div>');
+        addMsg('ai','<span class="ftitle">\u25B8 '+escapeHtml(f.name)+'</span><div class="small">'+t('dyn.demo')+'</div>');
       }else{
         input.value=ko+' 기능 만들어줘';input.focus();
       }
@@ -2315,8 +2337,8 @@ document.getElementById('importBtn').addEventListener('click',function(){
       library.push(f);added++;
     });
     renderLibrary();
-    addMsg('ai','라이브러리에 '+added+'개 기능을 가져왔습니다.');
-  }catch(e){logErr('가져오기 실패: '+e.message);}
+    addMsg('ai',t('dyn.importedPre')+added+t('dyn.imported'));
+  }catch(e){logErr(t('dyn.importfail')+e.message);}
 });
 
 /* ═══════════ DEPLOY EDITION: TTS MUTE TOGGLE ═══════════ */
