@@ -1290,34 +1290,39 @@ maze:{
   var st=Math.max(1,Math.min(4,(p.step|0)||2));
   var walls=[[0,0,60,2],[0,38,52,2],[0,0,2,40],[58,0,2,30],
    [10,2,2,26],[18,12,2,28],[28,2,2,26],[38,12,2,28],[48,2,2,20]];
-  dp.state.x=4;dp.state.y=4;
+  dp.state.x=4;dp.state.y=4;dp.state.px=-1;dp.state.py=-1;
+  function drawWalls(){dp.clear();walls.forEach(function(w){dp.rect(w[0],w[1],w[2],w[3],{fill:true});});}
+  function onWall(x,y){for(var i=0;i<walls.length;i++){var w=walls[i];if(x>=w[0]&&x<w[0]+w[2]&&y>=w[1]&&y<w[1]+w[3])return true;}return false;}
+  function moveCursor(){                            // 이전 플레이어 자리만 지우고(벽이면 복원) 새 자리만 칠함 → 변경 행 1~2개
+   if(dp.state.px>=0)for(var yy=dp.state.py;yy<dp.state.py+2;yy++)for(var xx=dp.state.px;xx<dp.state.px+2;xx++)dp.set(xx,yy,onWall(xx,yy)?1:0);
+   for(var y2=dp.state.y;y2<dp.state.y+2;y2++)for(var x2=dp.state.x;x2<dp.state.x+2;x2++)dp.set(x2,y2,1);
+   dp.state.px=dp.state.x;dp.state.py=dp.state.y;
+  }
   function hit(x,y){if(x<2||y<2||x>57||y>37)return!(x>=52&&y>=33);
    for(var i=0;i<walls.length;i++){var w=walls[i];if(x+1>=w[0]&&x<w[0]+w[2]&&y+1>=w[1]&&y<w[1]+w[3])return true;}return false;}
-  function draw(){dp.clear();walls.forEach(function(w){dp.rect(w[0],w[1],w[2],w[3],{fill:true});});
-   dp.rect(dp.state.x,dp.state.y,2,2,{fill:true});}
-  draw();dp.textLine('maze: find exit');
+  drawWalls();moveCursor();dp.textLine('maze: find exit');
   dp.onKey(function(k){var dx=0,dy=0;
    if(k==='F1')dy=-st;else if(k==='F4')dy=st;else if(k==='PAN_LEFT')dx=-st;else if(k==='PAN_RIGHT')dx=st;else return;
    var nx=dp.state.x+dx,ny=dp.state.y+dy;
-   if(nx>=56&&ny>=32){dp.state.x=nx;dp.state.y=ny;draw();dp.textLine('escape!');dp.speak('탈출 성공! 축하합니다.');return;}
+   if(nx>=56&&ny>=32){dp.state.x=nx;dp.state.y=ny;moveCursor();dp.textLine('escape!');dp.speak('탈출 성공! 축하합니다.');return;}
    if(hit(nx,ny)){dp.speak('벽입니다');return;}
-   dp.state.x=nx;dp.state.y=ny;draw();});
+   dp.state.x=nx;dp.state.y=ny;moveCursor();});
  }},
 caption:{
  schema:'(파라미터 없음) 마이크 음성 → 멀티라인 점자 자막. F1 지우기 F2 일시정지',
  defaults:{},
  run:function(dp,p){
-  dp.state.txt='';dp.state.tmp='';dp.state.on=true;dp.state._rt=0;
-  function render(){drawBrailleBlock(dp,dp.state.txt+dp.state.tmp);}
+  dp.state.txt='';dp.state.tmp='';dp.state.on=true;dp.state._rt=0;dp.state._last='';
+  function render(){var s=dp.state.txt+dp.state.tmp;if(s===dp.state._last)return;dp.state._last=s;drawBrailleBlock(dp,s);}
   function requestRender(){
    if(dp.state._rt)return;
-   dp.state._rt=dp.timeout(120,function(){dp.state._rt=0;render();});
+   dp.state._rt=dp.timeout(220,function(){dp.state._rt=0;render();});   // 디바운스 상향: interim 결과로 같은 줄 재전송 빈도 감소
   }
   dp.textLine('live caption');render();
   dp.listen(function(t,fin){
    if(!dp.state.on)return;
-   if(fin){dp.state.txt+=t+' ';dp.state.tmp='';}else{dp.state.tmp=t;}
-   requestRender();
+   if(fin){dp.state.txt+=t+' ';dp.state.tmp='';requestRender();}
+   else{if(t===dp.state.tmp)return;dp.state.tmp=t;requestRender();}   // 같은 interim 반복이면 무시
   });
   dp.onKey(function(k){
    if(k==='F1'){dp.state.txt='';dp.state.tmp='';render();dp.speak('자막을 지웠습니다');}
@@ -1398,26 +1403,30 @@ timer:{
  run:function(dp,p){
   var total=Math.max(1,Math.min(5940,(p.seconds|0)||60));
   var down=(p.mode!=='stopwatch');
-  dp.state.t=down?total:0;dp.state.run=false;
+  dp.state.t=down?total:0;dp.state.run=false;dp.state.lastW=-1;
   function fmt(t){var m=Math.floor(t/60),s=t%60;return ('0'+m).slice(-2)+':'+('0'+s).slice(-2);}
-  function draw(){
+  function barW(){var frac=down?dp.state.t/total:Math.min(1,dp.state.t/total);return Math.round(frac*56);}
+  function drawBar(){                              // 진행바(그래픽)는 폭이 바뀔 때만 — 매초 행 리셋 방지
+   var w=barW();
    dp.clear();
-   var frac=down?dp.state.t/total:Math.min(1,dp.state.t/total);
-   var w=Math.round(frac*56);
    dp.rect(2,16,56,8);
    if(w>0)dp.rect(2,16,w,8,{fill:true});
-   dp.textLine((down?'timer ':'sw ')+fmt(dp.state.t));
+   dp.state.lastW=w;
   }
-  draw();
+  function tick(){                                 // 매초: 시간 텍스트(20셀 라인)만 갱신, 그래픽은 폭 변화 시에만
+   dp.textLine((down?'timer ':'sw ')+fmt(dp.state.t));
+   if(barW()!==dp.state.lastW)drawBar();
+  }
+  drawBar();tick();
   dp.interval(1000,function(){
    if(!dp.state.run)return;
    dp.state.t+=down?-1:1;
-   if(down&&dp.state.t<=0){dp.state.t=0;dp.state.run=false;draw();dp.textLine('time up!');dp.speak('시간이 다 됐습니다');return;}
-   draw();
+   if(down&&dp.state.t<=0){dp.state.t=0;dp.state.run=false;drawBar();dp.textLine('time up!');dp.speak('시간이 다 됐습니다');return;}
+   tick();
   });
   dp.onKey(function(k){
    if(k==='F1'){dp.state.run=!dp.state.run;dp.speak(dp.state.run?'시작':'일시정지');}
-   else if(k==='F2'){dp.state.run=false;dp.state.t=down?total:0;draw();dp.speak('리셋');}
+   else if(k==='F2'){dp.state.run=false;dp.state.t=down?total:0;drawBar();tick();dp.speak('리셋');}
    else if(k==='F3'){dp.speak((down?'남은 시간 ':'경과 시간 ')+Math.floor(dp.state.t/60)+'분 '+dp.state.t%60+'초');}
   });
  }},
