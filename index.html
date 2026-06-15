@@ -294,7 +294,7 @@
         </div>
       </div>
       <div class="block">
-        <div class="block-head"><span data-i18n="lib.title">FEATURE LIBRARY</span><span style="display:flex;gap:8px"><button class="btn" id="importBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.import">IMPORT</button><button class="btn" id="exportBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.export">EXPORT</button></span></div>
+        <div class="block-head"><span data-i18n="lib.title">FEATURE LIBRARY</span><span style="display:flex;gap:8px"><button class="btn" id="shareBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.share">SHARE LINK</button><button class="btn" id="importBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.import">IMPORT</button><button class="btn" id="exportBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.export">EXPORT</button></span></div>
         <div id="library"><div class="empty" data-i18n="lib.empty">데모 기능이 시뮬레이터에 로드됨</div></div>
       </div>
     </div>
@@ -307,12 +307,12 @@
             <canvas id="pad" role="img" aria-label="닷패드 시뮬레이터 — 60×40 점자 핀 출력 미리보기" width="672" height="452" aria-label="DotPad 60x40 시뮬레이터"></canvas>
           </div>
           <div class="keys">
-            <button class="hwkey pan" data-key="PAN_LEFT">&#9664; PAN<span class="keycap">&larr; KEY</span></button>
-            <button class="hwkey" data-key="F1">F1<span class="keycap">KEY 1</span></button>
-            <button class="hwkey" data-key="F2">F2<span class="keycap">KEY 2</span></button>
-            <button class="hwkey" data-key="F3">F3<span class="keycap">KEY 3</span></button>
-            <button class="hwkey" data-key="F4">F4<span class="keycap">KEY 4</span></button>
-            <button class="hwkey pan" data-key="PAN_RIGHT">PAN &#9654;<span class="keycap">&rarr; KEY</span></button>
+            <button class="hwkey pan" data-key="PAN_LEFT">&#9664; PAN<span class="keycap" id="cap-PL">&larr; KEY</span></button>
+            <button class="hwkey" data-key="F1">F1<span class="keycap" id="cap-F1">KEY 1</span></button>
+            <button class="hwkey" data-key="F2">F2<span class="keycap" id="cap-F2">KEY 2</span></button>
+            <button class="hwkey" data-key="F3">F3<span class="keycap" id="cap-F3">KEY 3</span></button>
+            <button class="hwkey" data-key="F4">F4<span class="keycap" id="cap-F4">KEY 4</span></button>
+            <button class="hwkey pan" data-key="PAN_RIGHT">PAN &#9654;<span class="keycap" id="cap-PR">&rarr; KEY</span></button>
           </div>
         </div>
       </div>
@@ -411,7 +411,15 @@
             <input type="range" id="cfgVolMic" min="10" max="100" step="5" style="width:100%">
           </div>
         </div>
-        <div class="note">기기에 설치된 한국어 음성 목록입니다. Windows에서는 <span style="color:var(--ink-soft)">Edge</span> 브라우저가 신경망 음성(Natural)을 제공해 가장 자연스럽습니다.</div>
+        <div class="frow" style="margin-top:10px">
+          <div>
+            <label for="cfgRate">말하기 속도 <span id="rateVal" aria-hidden="true"></span></label>
+            <input type="range" id="cfgRate" min="70" max="160" step="5" style="width:100%">
+          </div>
+          <div></div>
+        </div>
+        <div class="note" id="voiceNote">기기에 설치된 음성 목록입니다. Windows에서는 Edge 브라우저가 신경망 음성(Natural)을 제공해 가장 자연스럽습니다.</div>
+        <div class="note" id="voiceWarn" style="color:#ffcf72;display:none"></div>
       </div>
       <div class="field">
         <div class="note">BLE는 저장소에 <span style="color:var(--ink-soft)">DotPadSDK-3.0.0.js</span>가 있으면 공식 SDK로 연결됩니다(스캔·패킷·ACK·하드웨어 키 자동 처리). 위 UUID/인코딩/쓰기 설정은 SDK 파일이 없을 때의 raw 폴백 전용입니다.</div>
@@ -896,10 +904,10 @@ function createDP(){
     listen:function(fn){
       if(dead)return false;
       var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-      if(!SR){tts('이 브라우저는 음성 인식을 지원하지 않습니다. 크롬에서 열어주세요.');return false;}
+      if(!SR){tts(LANG==='en'?'Speech recognition is not supported in this browser. Please use Chrome.':'이 브라우저는 음성 인식을 지원하지 않습니다. 크롬에서 열어주세요.');return false;}
       if(window.stopDictation)stopDictation();   // MIC 받아쓰기와 동시 실행 불가 — 충돌 방지
       dp.stopListen();
-      recog=new SR();recog.lang='ko-KR';recog.continuous=true;recog.interimResults=true;
+      recog=new SR();recog.lang=(LANG==='en'?'en-US':'ko-KR');recog.continuous=true;recog.interimResults=true;
       recog.onstart=function(){if(!dead)micActive(true);};
       recog.onresult=function(e){
         if(dead)return;
@@ -991,7 +999,7 @@ function tts(text){
   try{
     speechSynthesis.cancel();
     var u=new SpeechSynthesisUtterance(text);
-    u.lang=(LANG==='en'?'en-US':'ko-KR');u.rate=1.05;u.pitch=1;u.volume=ttsVol();
+    u.lang=(LANG==='en'?'en-US':'ko-KR');u.rate=((window.SD&&SD.cfg.rate)||105)/100;u.pitch=1;u.volume=ttsVol();
     if(!TTSV.pick||TTSV.lockLang!==LANG)refreshVoices();
     if(TTSV.pick){u.voice=TTSV.pick;TTSV.locked=true;TTSV.lockLang=LANG;}
     speechSynthesis.speak(u);
@@ -1032,9 +1040,16 @@ var EDU_PACKS={vocab:{
  mid1:{name:'중1 영단어',items:[['ability','능력'],['borrow','빌리다'],['classmate','반 친구'],['decide','결정하다'],['enough','충분한'],['favorite','가장 좋아하는'],['grade','학년, 성적'],['health','건강'],['important','중요한'],['library','도서관'],['mistake','실수'],['nature','자연'],['practice','연습하다'],['question','질문'],['remember','기억하다'],['subject','과목'],['travel','여행하다'],['usually','보통'],['weather','날씨'],['worry','걱정하다']]},
  verbs:{name:'불규칙 동사',items:[['go - went - gone','가다'],['come - came - come','오다'],['eat - ate - eaten','먹다'],['drink - drank - drunk','마시다'],['see - saw - seen','보다'],['take - took - taken','가져가다'],['give - gave - given','주다'],['make - made - made','만들다'],['know - knew - known','알다'],['write - wrote - written','쓰다'],['speak - spoke - spoken','말하다'],['begin - began - begun','시작하다']]},
  proverb:{name:'속담',items:[['가는 말이 고와야 오는 말이 곱다','내가 잘해야 남도 잘한다'],['낮말은 새가 듣고 밤말은 쥐가 듣는다','말은 늘 조심해야 한다'],['등잔 밑이 어둡다','가까운 일을 오히려 잘 모른다'],['백지장도 맞들면 낫다','쉬운 일도 힘을 합치면 더 쉽다'],['소 잃고 외양간 고친다','일이 잘못된 뒤에는 후회해도 소용없다'],['천 리 길도 한 걸음부터','큰일도 작은 일에서 시작된다'],['티끌 모아 태산','작은 것도 모이면 크게 된다'],['하늘이 무너져도 솟아날 구멍이 있다','아무리 어려워도 해결할 방법은 있다']]},
- idiom:{name:'사자성어',items:[['고진감래','고생 끝에 즐거움이 온다'],['다다익선','많으면 많을수록 좋다'],['동고동락','괴로움과 즐거움을 함께한다'],['역지사지','상대방의 처지에서 생각한다'],['유비무환','미리 준비하면 걱정이 없다'],['일석이조','한 가지 일로 두 가지 이익을 얻는다'],['작심삼일','결심이 사흘을 가지 못한다'],['타산지석','남의 잘못도 나를 갈고닦는 데 도움이 된다']]}
+ idiom:{name:'사자성어',items:[['고진감래','고생 끝에 즐거움이 온다'],['다다익선','많으면 많을수록 좋다'],['동고동락','괴로움과 즐거움을 함께한다'],['역지사지','상대방의 처지에서 생각한다'],['유비무환','미리 준비하면 걱정이 없다'],['일석이조','한 가지 일로 두 가지 이익을 얻는다'],['작심삼일','결심이 사흘을 가지 못한다'],['타산지석','남의 잘못도 나를 갈고닦는 데 도움이 된다']]},
+ sight:{name:'Sight words (영어권 입문)',items:[['the','그/그것'],['and','그리고'],['you','너'],['that','저것'],['was','였다'],['for','위하여'],['are','이다'],['with','함께'],['his','그의'],['they','그들'],['have','가지다'],['this','이것'],['from','부터'],['one','하나'],['had','가졌다'],['word','단어']]}
 }};
-var VOCAB_EN_TITLE={'초등 기초 영단어':'Elementary basic English words','중1 영단어':'Grade 7 English words','불규칙 동사':'Irregular verbs','속담':'Korean proverbs','사자성어':'Four-character idioms'};
+var EDU_QUIZ={
+ capital:{name:'세계 수도',en:'World capitals',q:[['대한민국의 수도는?','서울','도쿄','베이징'],['일본의 수도는?','도쿄','서울','오사카'],['프랑스의 수도는?','파리','런던','로마'],['영국의 수도는?','런던','파리','베를린'],['미국의 수도는?','워싱턴 D.C.','뉴욕','로스앤젤레스'],['독일의 수도는?','베를린','뮌헨','함부르크'],['이탈리아의 수도는?','로마','밀라노','베네치아'],['중국의 수도는?','베이징','상하이','홍콩']],
+   qe:[['Capital of South Korea?','Seoul','Tokyo','Beijing'],['Capital of Japan?','Tokyo','Seoul','Osaka'],['Capital of France?','Paris','London','Rome'],['Capital of the UK?','London','Paris','Berlin'],['Capital of the USA?','Washington D.C.','New York','Los Angeles'],['Capital of Germany?','Berlin','Munich','Hamburg'],['Capital of Italy?','Rome','Milan','Venice'],['Capital of China?','Beijing','Shanghai','Hong Kong']]},
+ animal:{name:'동물 상식',en:'Animal facts',q:[['다리가 가장 많은 동물은?','지네','거미','개미'],['가장 큰 포유류는?','흰긴수염고래','코끼리','기린'],['날 수 있는 포유류는?','박쥐','다람쥐','펭귄'],['목이 가장 긴 동물은?','기린','낙타','타조'],['알을 낳는 포유류는?','오리너구리','돌고래','캥거루'],['가장 빠른 육상 동물은?','치타','사자','말'],['겨울잠을 자는 동물은?','곰','사슴','여우'],['물과 땅에서 모두 사는 동물은?','개구리','뱀','도마뱀']],
+   qe:[['Which animal has the most legs?','Centipede','Spider','Ant'],['Largest mammal?','Blue whale','Elephant','Giraffe'],['Which mammal can fly?','Bat','Squirrel','Penguin'],['Longest neck?','Giraffe','Camel','Ostrich'],['Which mammal lays eggs?','Platypus','Dolphin','Kangaroo'],['Fastest land animal?','Cheetah','Lion','Horse'],['Which animal hibernates?','Bear','Deer','Fox'],['Which lives both in water and on land?','Frog','Snake','Lizard']]}
+};
+var VOCAB_EN_TITLE={'초등 기초 영단어':'Elementary basic English words','중1 영단어':'Grade 7 English words','불규칙 동사':'Irregular verbs','속담':'Korean proverbs','사자성어':'Four-character idioms','Sight words (영어권 입문)':'Sight words'};
 var KCHO_NAME=['기역','쌍기역','니은','디귿','쌍디귿','리을','미음','비읍','쌍비읍','시옷','쌍시옷','이응','지읒','쌍지읒','치읓','키읔','티읕','피읖','히읗'];
 var KJUNG_NAME=['아','애','야','얘','어','에','여','예','오','와','왜','외','요','우','워','웨','위','유','으','의','이'];
 
@@ -1462,6 +1477,36 @@ function specFeature(spec,meta){
     tts_intro:meta.tts_intro||'',request:meta.request||'(스펙)',spec:spec};
 }
 
+/* #14 템플릿별 키맵 — 화면 키캡에 현재 기능의 키 역할 표시 (청인 영업사원용) */
+var KEYMAP={
+ bar_chart:{F1:['다음','next'],PL:['이전','prev'],PR:['다음','next']},
+ plot:{F1:['주기','cycles']},
+ dice:{F1:['굴리기','roll']},
+ clock:{F1:['시각','time']},
+ rps:{F1:['가위','sciss'],F2:['바위','rock'],F3:['보','paper']},
+ maze:{F1:['위','up'],F4:['아래','down'],PL:['왼쪽','left'],PR:['오른쪽','right']},
+ timer:{F1:['시작/정지','start'],F2:['리셋','reset'],F3:['남은시간','time']},
+ caption:{F1:['지우기','clear'],F2:['일시정지','pause']},
+ list_nav:{F1:['반복','repeat'],F2:['처음','first'],PL:['이전','prev'],PR:['다음','next']},
+ quiz:{F1:['1번','opt1'],F2:['2번','opt2'],F3:['3번','opt3']},
+ text_show:{F1:['읽기','read']},
+ vocab:{F1:['뜻','mean'],F2:['철자','spell'],F3:['섞기','shuffle'],PL:['이전','prev'],PR:['다음','next']},
+ braille_learn:{F1:['점번호','dots'],F2:['다시','again'],F3:['무작위','random'],PL:['이전','prev'],PR:['다음','next']},
+ number_line:{F1:['현재값','value'],F2:['처음','start'],PL:['왼쪽','left'],PR:['오른쪽','right']},
+ fraction:{F1:['읽기','read'],PL:['이전','prev'],PR:['다음','next']},
+ picker:{F1:['뽑기/다음','draw'],F2:['리셋','reset'],PL:['이전','prev'],PR:['다음','next']}
+};
+function applyKeymap(tmpl){
+  var def={F1:['KEY 1','KEY 1'],F2:['KEY 2','KEY 2'],F3:['KEY 3','KEY 3'],F4:['KEY 4','KEY 4'],PL:['\u2190 KEY','\u2190 KEY'],PR:['\u2192 KEY','\u2192 KEY']};
+  var km=(tmpl&&KEYMAP[tmpl])||{};
+  var ids={F1:'cap-F1',F2:'cap-F2',F3:'cap-F3',F4:'cap-F4',PL:'cap-PL',PR:'cap-PR'};
+  Object.keys(ids).forEach(function(k){
+    var el=document.getElementById(ids[k]);if(!el)return;
+    var v=km[k]||def[k];
+    el.textContent=(LANG==='en'?(v[1]||v[0]):v[0]);
+  });
+}
+
 function loadFeature(feature,speakIntro){
   if(speakIntro===undefined)speakIntro=true;
   if(currentDP)currentDP._destroy();
@@ -1469,6 +1514,7 @@ function loadFeature(feature,speakIntro){
   frameBuf.fill(0);textBuf.fill(0);requestPaint();
   currentDP=createDP();currentFeature=feature;
   featureNameEl.textContent=feature.name||'\u2014';
+  applyKeymap(feature.spec?feature.spec.template:null);   // #14 키맵 표시
   codeView.textContent=feature.spec?JSON.stringify(feature.spec,null,1):feature.code;codeBox.hidden=false;
   try{
     if(feature.spec)runSpec(currentDP,feature.spec);
@@ -1485,6 +1531,22 @@ document.addEventListener('keydown',function(e){
   var map={'1':'F1','2':'F2','3':'F3','4':'F4','ArrowLeft':'PAN_LEFT','ArrowRight':'PAN_RIGHT'},k=map[e.key];
   if(k){e.preventDefault();logKey(k);if(currentDP)currentDP._fireKey(k);}
 });
+/* #15 모바일 터치 제스처: 시뮬레이터에서 좌우 스와이프=팬, 탭=F1, 위/아래 스와이프=F1/F4 */
+(function(){
+  var pad=document.getElementById('pad');if(!pad)return;
+  var sx=0,sy=0,st=0,moved=false;
+  pad.addEventListener('touchstart',function(e){var t=e.changedTouches[0];sx=t.clientX;sy=t.clientY;st=Date.now();moved=false;},{passive:true});
+  pad.addEventListener('touchmove',function(){moved=true;},{passive:true});
+  pad.addEventListener('touchend',function(e){
+    if(!currentDP)return;
+    var t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy,adx=Math.abs(dx),ady=Math.abs(dy),dt=Date.now()-st;
+    var k=null;
+    if(adx<14&&ady<14&&dt<400){k='F1';}                       // 탭 = F1(기본 동작)
+    else if(adx>ady&&adx>28){k=dx>0?'PAN_RIGHT':'PAN_LEFT';}    // 가로 스와이프 = 팬
+    else if(ady>=adx&&ady>28){k=dy>0?'F4':'F1';}               // 세로 스와이프 = F4/F1
+    if(k){logKey(k);currentDP._fireKey(k);}
+  },{passive:true});
+})();
 
 /* CLAUDE API */
 var SYSTEM_PROMPT=[
@@ -1514,38 +1576,50 @@ function addMsg(cls,html){var d=document.createElement('div');d.className='msg '
 
 /* ═══════════ TIER 2: 로컬 매칭 — 키워드 점수 + 정규식 파라미터 추출 (오프라인) ═══════════ */
 var MATCH_RULES=[
- {t:'vocab',kw:[['단어장',5],['단어 카드',5],['낱말 카드',5],['낱말카드',5],['영단어',4],['불규칙 동사',5],['불규칙동사',5],['속담',5],['사자성어',5],['고사성어',5],['단어',2],['카드',2],['사전',3],['용어',2]]},
- {t:'braille_learn',kw:[['점자 배우',6],['점자배우',6],['점자 학습',6],['점자 공부',6],['점자 연습',5],['자모',5],['알파벳',5],['한글 배우',5],['한글배우',5],['파닉스',5]]},
- {t:'number_line',kw:[['수직선',5],['음수',4],['양수',3],['수의 크기',3]]},
- {t:'fraction',kw:[['분수',5]]},
- {t:'picker',kw:[['뽑기',5],['추첨',5],['뽑아줘',5],['뽑아 줘',5],['발표 순서',6],['발표순서',6],['모둠',5],['조 나누',5],['자리 바꾸',5],['자리바꾸',5],['순서 정해',4]]},
- {t:'rps',kw:[['가위바위보',5],['가위 바위 보',5]]},
- {t:'dice',kw:[['주사위',5],['굴리',1]]},
- {t:'maze',kw:[['미로',5]]},
- {t:'caption',kw:[['자막',5],['받아쓰',5],['받아 적',4],['말하면',2],['음성',1]]},
- {t:'clock',kw:[['시계',5],['시각',4],['몇 시',4]]},
- {t:'timer',kw:[['타이머',5],['카운트다운',5],['스톱워치',5],['스탑워치',5]]},
- {t:'quiz',kw:[['퀴즈',5],['문제 내',4],['구구단',5],['암산',5],['덧셈',4],['뺄셈',4],['곱셈',3],['시험',2],['맞히',2],['맞추',2]],needAI:true},
- {t:'plot',kw:[['사인',5],['코사인',5],['싸인',5],['파형',4],['곡선',3],['함수',2]]},
- {t:'bar_chart',kw:[['막대',4],['차트',3],['매출',2],['통계',2],['그래프',2],['비교',1]]},
- {t:'list_nav',kw:[['메뉴',4],['목록',4],['리스트',4],['단계',2],['순서',2],['차례',2]]},
- {t:'text_show',kw:[['점자로',4],['점자 출력',4],['써줘',2],['보여줘',1],['표시해',1]]}
+ {t:'vocab',kw:[['단어장',5],['단어 카드',5],['낱말 카드',5],['낱말카드',5],['영단어',4],['불규칙 동사',5],['불규칙동사',5],['속담',5],['사자성어',5],['고사성어',5],['단어',2],['카드',2],['사전',3],['용어',2],['vocab',5],['vocabulary',5],['word list',5],['word card',5],['flashcard',5],['flash card',5],['sight word',5],['irregular verb',5],['proverb',5],['idiom',5],['words',2]]},
+ {t:'braille_learn',kw:[['점자 배우',6],['점자배우',6],['점자 학습',6],['점자 공부',6],['점자 연습',5],['자모',5],['알파벳',5],['한글 배우',5],['한글배우',5],['파닉스',5],['learn braille',6],['braille practice',6],['teach braille',6],['alphabet',5],['phonics',5],['letters',2]]},
+ {t:'number_line',kw:[['수직선',5],['음수',4],['양수',3],['수의 크기',3],['number line',6],['negative number',4],['integer',3]]},
+ {t:'fraction',kw:[['분수',5],['fraction',6]]},
+ {t:'picker',kw:[['뽑기',5],['추첨',5],['뽑아줘',5],['뽑아 줘',5],['발표 순서',6],['발표순서',6],['모둠',5],['조 나누',5],['자리 바꾸',5],['자리바꾸',5],['순서 정해',4],['random pick',6],['picker',5],['draw a number',5],['presentation order',6],['group',4],['groups',4],['shuffle',3],['raffle',5]]},
+ {t:'rps',kw:[['가위바위보',5],['가위 바위 보',5],['rock paper scissors',6],['rps',5]]},
+ {t:'dice',kw:[['주사위',5],['굴리',1],['dice',6],['roll',3],['die',4]]},
+ {t:'maze',kw:[['미로',5],['maze',6],['labyrinth',5]]},
+ {t:'caption',kw:[['자막',5],['받아쓰',5],['받아 적',4],['말하면',2],['음성',1],['caption',6],['subtitle',5],['live caption',6],['transcribe',5],['dictation',4]]},
+ {t:'clock',kw:[['시계',5],['시각',4],['몇 시',4],['clock',6],['time',3],['what time',4]]},
+ {t:'timer',kw:[['타이머',5],['카운트다운',5],['스톱워치',5],['스탑워치',5],['timer',6],['countdown',5],['stopwatch',5]]},
+ {t:'quiz',kw:[['퀴즈',5],['문제 내',4],['구구단',5],['암산',5],['덧셈',4],['뺄셈',4],['곱셈',3],['시험',2],['맞히',2],['맞추',2],['quiz',6],['multiplication',5],['times table',5],['mental math',5],['addition',4],['subtraction',4],['test',2]],needAI:true},
+ {t:'plot',kw:[['사인',5],['코사인',5],['싸인',5],['파형',4],['곡선',3],['함수',2],['sine',6],['cosine',5],['sin wave',5],['waveform',4],['curve',3],['function',2],['graph',2]]},
+ {t:'bar_chart',kw:[['막대',4],['차트',3],['매출',2],['통계',2],['그래프',2],['비교',1],['bar chart',5],['bar graph',5],['barchart',5],['sales',2],['statistics',2],['chart',2]]},
+ {t:'list_nav',kw:[['메뉴',4],['목록',4],['리스트',4],['시간표',5],['알림장',5],['숙제',4],['명단',4],['단계',2],['순서',2],['차례',2],['menu',4],['list',3],['timetable',5],['schedule',5],['roster',4],['homework',4],['steps',2]]},
+ {t:'text_show',kw:[['점자로',4],['점자 출력',4],['써줘',2],['보여줘',1],['표시해',1],['in braille',4],['show braille',4],['display text',3]]}
 ];
-function extractItems(req){            // "메뉴: 김치찌개, 된장찌개" / "a, b, c 목록"
+function extractItems(req){            // "메뉴: 김치찌개, 된장찌개" / "a, b, c 목록" / "시간표 국어 수학 영어"
   var part=req,m=req.match(/[:：](.+)$/);
   if(m)part=m[1];
-  if(part.indexOf(',')<0&&part.indexOf('、')<0)return null;
+  if(part.indexOf(',')<0&&part.indexOf('、')<0){
+    // 콜론/쉼표가 없으면: 트리거어(시간표/메뉴/목록 등) 뒤의 공백 구분 단어들을 항목으로
+    var tm=part.match(/(?:시간표|알림장|메뉴|목록|리스트|명단|숙제|timetable|schedule|menu|list|roster|homework)\s*(?:은|는|:)?\s*(.+)$/i);
+    if(tm){
+      var ws=tm[1].replace(/(을|를|으로|로)?\s*(만들어줘|만들어|보여줘|해줘|알려줘|please|make|show)?\s*$/i,'').trim().split(/[\s,]+/)
+        .filter(function(t){return t.length>0&&t.length<=20;});
+      if(ws.length>=2)return ws;
+    }
+    return null;
+  }
   var items=part.split(/[,、]/).map(function(t){return t.trim().replace(/(을|를|으로|로)?\s*(목록|메뉴|리스트|만들어줘|만들어|보여줘|해줘)?\s*$/,'').trim();})
     .filter(function(t){return t.length>0&&t.length<=20;});
   return items.length>=2?items:null;
 }
 function localMatch(req){
+  var low=String(req).toLowerCase();       // 영어 키워드는 대소문자 무시
   var best=null,second=0;
   for(var i=0;i<MATCH_RULES.length;i++){
     var r=MATCH_RULES[i],sc=0;
-    for(var j=0;j<r.kw.length;j++)if(req.indexOf(r.kw[j][0])>=0)sc+=r.kw[j][1];
+    for(var j=0;j<r.kw.length;j++)if(low.indexOf(r.kw[j][0])>=0)sc+=r.kw[j][1];
     if(sc>0){if(!best||sc>best.score){if(best)second=best.score;best={rule:r,score:sc};}else if(sc>second)second=sc;}
   }
+  // 숫자 데이터가 여러 개 나열되면 차트 신호로 보정 (예: "매출 32 45 28")
+  if(best&&best.rule.t==='bar_chart'&&best.score<3){var dn=(req.match(/-?\d+(?:\.\d+)?/g)||[]);if(dn.length>=3)best.score+=2;}
   if(!best||best.score<3)return null;
   var t=best.rule.t,params={},needAI=!!best.rule.needAI;
   var nums=(req.match(/-?\d+(?:\.\d+)?/g)||[]).map(Number);
@@ -1553,14 +1627,15 @@ function localMatch(req){
     if(nums.length>=2&&nums.length<=12)params.data=nums;
     var it=extractItems(req);if(it&&params.data&&it.length===params.data.length)params.labels=it;
   }
-  else if(t==='plot'){params.fn=/코사인/.test(req)?'cos':'sin';if(nums[0]>=1&&nums[0]<=6)params.cycles=nums[0];}
+  else if(t==='plot'){params.fn=/코사인|cosine|cos/.test(low)?'cos':'sin';if(nums[0]>=1&&nums[0]<=6)params.cycles=nums[0];}
   else if(t==='dice'){if(nums[0]>=2&&nums[0]<=9)params.sides=nums[0];}
   else if(t==='maze'){if(nums[0]>=1&&nums[0]<=4)params.step=nums[0];}
   else if(t==='timer'){
-    var mm=req.match(/(\d+)\s*분/),ss=req.match(/(\d+)\s*초/);
+    var mm=req.match(/(\d+)\s*(?:분|min|minute)/i),ss=req.match(/(\d+)\s*(?:초|sec|second)/i);
     var sec=(mm?+mm[1]*60:0)+(ss?+ss[1]:0);
+    if(!mm&&!ss&&nums[0]>0)sec=nums[0]*(nums[0]<=20?60:1);   // 단위 없는 숫자: 20 이하 분, 초과 초로 추정
     if(sec>0)params.seconds=sec;
-    if(/스톱워치|스탑워치/.test(req))params.mode='stopwatch';
+    if(/스톱워치|스탑워치|stopwatch/.test(low))params.mode='stopwatch';
   }
   else if(t==='list_nav'){
     var items=extractItems(req);
@@ -1568,16 +1643,17 @@ function localMatch(req){
   }
   else if(t==='vocab'){
     var V=EDU_PACKS.vocab;
-    var eng=/영어|영단어|단어장|스펠링/.test(req);
-    if(/불규칙\s*동사/.test(req)){params.items=V.verbs.items;params.title=V.verbs.name;}
-    else if(/속담/.test(req)){params.items=V.proverb.items;params.title=V.proverb.name;}
-    else if(/사자성어|고사성어/.test(req)){params.items=V.idiom.items;params.title=V.idiom.name;}
-    else if(eng&&/초등|초\s*[1-6]|기초|어린이/.test(req)){params.items=V.elem.items;params.title=V.elem.name;}
+    var eng=/영어|영단어|단어장|스펠링|vocab|word|english|spelling/.test(low);
+    if(/sight\s*word|영어권/i.test(low)){params.items=V.sight.items;params.title=V.sight.name;}
+    else if(/불규칙\s*동사|irregular/i.test(low)){params.items=V.verbs.items;params.title=V.verbs.name;}
+    else if(/속담|proverb/i.test(low)){params.items=V.proverb.items;params.title=V.proverb.name;}
+    else if(/사자성어|고사성어|idiom/i.test(low)){params.items=V.idiom.items;params.title=V.idiom.name;}
+    else if(eng&&/초등|초\s*[1-6]|기초|어린이|elementary|basic|kid/i.test(low)){params.items=V.elem.items;params.title=V.elem.name;}
     else if(eng){params.items=V.mid1.items;params.title=V.mid1.name;}   // 중학·일반 기본팩
-    else needAI=true;                                  // 주제형(경제 용어 등) — AI 콘텐츠 생성                                  // 주제형(경제 용어 등) — AI 콘텐츠 생성
+    else needAI=true;                                  // 주제형(경제 용어 등) — AI 콘텐츠 생성
   }
   else if(t==='braille_learn'){
-    params.mode=/알파벳|영어|abc|파닉스/i.test(req)?'alpha':(/숫자/.test(req)?'digit':'hangul');
+    params.mode=/알파벳|영어|abc|파닉스|alphabet|phonics|english/i.test(low)?'alpha':(/숫자|digit|number/i.test(low)?'digit':'hangul');
   }
   else if(t==='number_line'){
     var ml=nums.filter(function(x){return x>=-20&&x<=20;}).slice(0,6);
@@ -1591,27 +1667,39 @@ function localMatch(req){
     if(fs.length)params.fracs=fs;
   }
   else if(t==='picker'){
-    params.mode=/모둠|조 나누/.test(req)?'group':(/순서/.test(req)?'order':'pick');
-    var sz=req.match(/(\d+)\s*명씩/);if(sz)params.size=+sz[1];
-    var ct=req.replace(/\d+\s*명씩/,'').match(/(\d+)\s*명/);if(ct)params.count=+ct[1];
+    params.mode=/모둠|조 나누|group/i.test(low)?'group':(/순서|order/i.test(low)?'order':'pick');
+    var sz=req.match(/(\d+)\s*명씩/)||req.match(/of\s*(\d+)/i)||req.match(/groups?\s*of\s*(\d+)/i);if(sz)params.size=+sz[1];
+    var ct=req.replace(/\d+\s*명씩/,'').replace(/of\s*\d+/i,'').match(/(\d+)\s*명/)||req.match(/(\d+)\s*(?:people|students|kids)/i);if(ct)params.count=+ct[1];
   }
   else if(t==='quiz'){
-    if(/구구단/.test(req)){
-      var dan=req.match(/([2-9])\s*단/),d=dan?+dan[1]:2+Math.floor(Math.random()*8),qs=[];
+    if(/구구단|times table|multiplication/i.test(low)){
+      var dan=req.match(/([2-9])\s*(?:단|times)/i),d=dan?+dan[1]:2+Math.floor(Math.random()*8),qs=[];
       var ks=[2,3,4,5,6,7,8,9];
       for(var qi=ks.length-1;qi>0;qi--){var qj=Math.floor(Math.random()*(qi+1)),qt=ks[qi];ks[qi]=ks[qj];ks[qj]=qt;}
       for(var kq=0;kq<8;kq++){var kk=ks[kq],ans=d*kk,wrong=ans+(Math.random()<0.5?d:-d);if(wrong<=0)wrong=ans+d;
         var opts=Math.random()<0.5?[''+ans,''+wrong,''+(ans+1)]:[''+wrong,''+ans,''+(ans-1)];
         qs.push({q:d+' 곱하기 '+kk+'는?',options:opts,answer:opts.indexOf(''+ans)});}
       params.questions=qs;needAI=false;
-    }else if(/암산|덧셈|뺄셈/.test(req)){
-      var sub=/뺄셈/.test(req),qs2=[];
+    }else if(/암산|덧셈|뺄셈|mental math|addition|subtraction/i.test(low)){
+      var sub=/뺄셈|subtraction/i.test(low),qs2=[];
       for(var ai=0;ai<8;ai++){var a=10+Math.floor(Math.random()*80),b2=10+Math.floor(Math.random()*40);
         if(sub&&b2>a){var tt=a;a=b2;b2=tt;}
         var an=sub?a-b2:a+b2,wr=an+(Math.random()<0.5?1:-1)*(1+Math.floor(Math.random()*3));
         var op2=Math.random()<0.5?[''+an,''+wr,''+(an+10)]:[''+wr,''+an,''+(an-10)];
         qs2.push({q:a+(sub?' 빼기 ':' 더하기 ')+b2+'는?',options:op2,answer:op2.indexOf(''+an)});}
       params.questions=qs2;needAI=false;
+    }else if(/수도|capital/i.test(low)){
+      params.questions=EDU_QUIZ.capital[LANG==='en'?'qe':'q'].map(function(row){
+        var opts=row.slice(1).slice(),ans=opts[0];
+        for(var s=opts.length-1;s>0;s--){var j=Math.floor(Math.random()*(s+1)),tmp=opts[s];opts[s]=opts[j];opts[j]=tmp;}
+        return {q:row[0],options:opts,answer:opts.indexOf(ans)};});
+      needAI=false;
+    }else if(/동물|animal/i.test(low)){
+      params.questions=EDU_QUIZ.animal[LANG==='en'?'qe':'q'].map(function(row){
+        var opts=row.slice(1).slice(),ans=opts[0];
+        for(var s=opts.length-1;s>0;s--){var j=Math.floor(Math.random()*(s+1)),tmp=opts[s];opts[s]=opts[j];opts[j]=tmp;}
+        return {q:row[0],options:opts,answer:opts.indexOf(ans)};});
+      needAI=false;
     }
   }
   else if(t==='text_show'){
@@ -1711,6 +1799,29 @@ function generate(){
     if(loadFeature(feat)){finish(feat,'[T2] 로컬 매칭(점수 '+m.score+') \u00B7 API 미사용');return;}
   }
 
+  /* ── #8 clarify: 오프라인(API 미설정)에서 템플릿은 잡혔으나 내용이 없는 모호 요청 → 되묻기 ── */
+  var hasApi=!!(SD.cfg.api&&SD.cfg.api.trim());
+  if(!hasApi&&m&&m.needAI){
+    var hints={
+      list_nav:[ '시간표: 국어, 수학, 과학','메뉴: 김치찌개, 비빔밥' ],
+      quiz:[ '구구단 7단 문제','세계 수도 퀴즈','동물 퀴즈' ],
+      vocab:[ '중1 영어단어장','속담','사자성어' ]
+    };
+    var hintsEn={
+      list_nav:[ 'timetable: korean, math, science','menu: pizza, salad' ],
+      quiz:[ 'multiplication 7 times','world capitals quiz','animal quiz' ],
+      vocab:[ 'sight words','grade 7 english words' ]
+    };
+    var ex=(LANG==='en'?hintsEn:hints)[m.template];
+    if(ex){
+      addMsg('ai','<span class="small">'+(LANG==='en'
+        ? 'Tell me the contents and I can build it offline. For example:'
+        : '내용을 알려주시면 오프라인으로 바로 만들 수 있어요. 예를 들면:')
+        +'</span><div class="small">'+ex.map(function(e){return '&middot; '+escapeHtml(e);}).join('<br>')+'</div>');
+      return;
+    }
+  }
+
   /* ── T3/T4: API 필요 ── */
   genBtn.disabled=true;genBtn.innerHTML='<span class="spin"></span>'+t('dyn.generating');
   function done(){genBtn.disabled=false;genBtn.textContent=t('dyn.genbtn');}
@@ -1773,6 +1884,20 @@ function renderLibrary(){
     item.appendChild(loadB);item.appendChild(delB);libraryEl.appendChild(item);
   });
 }
+document.getElementById('shareBtn').addEventListener('click',function(){
+  try{
+    // 데모(id 0~7 내장) 제외, 사용자가 만든 기능만 공유
+    var custom=library.filter(function(f){return !(f.id>=0&&f.id<=7&&/DEMO/.test(f.name||''));});
+    if(!custom.length){addMsg('ai',LANG==='en'?'No custom features to share yet — generate one first.':'공유할 기능이 아직 없습니다 — 먼저 기능을 만들어 주세요.');return;}
+    var json=JSON.stringify(custom);
+    var b64=btoa(unescape(encodeURIComponent(json))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    var url=location.origin+location.pathname+'#lib='+b64;
+    if(url.length>8000){addMsg('ai',LANG==='en'?'Too many features for a link — use EXPORT/IMPORT instead.':'기능이 많아 링크로는 무리입니다 — EXPORT/IMPORT를 사용하세요.');return;}
+    function ok(){addMsg('ai',(LANG==='en'?'Share link copied ('+custom.length+' features). Anyone who opens it loads these features.':'공유 링크 복사됨 ('+custom.length+'개 기능). 링크를 열면 이 기능들이 로드됩니다.'));}
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url).then(ok).catch(function(){codeView.textContent=url;codeBox.hidden=false;codeBox.open=true;ok();});
+    else{codeView.textContent=url;codeBox.hidden=false;codeBox.open=true;ok();}
+  }catch(e){logErr((LANG==='en'?'Share failed: ':'공유 실패: ')+e.message);}
+});
 document.getElementById('exportBtn').addEventListener('click',function(){
   var json=JSON.stringify(library,null,2);
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(json).then(function(){addMsg('ai',t('dyn.exportedPre')+library.length+t('dyn.exported'));}).catch(function(){codeView.textContent=json;codeBox.hidden=false;codeBox.open=true;addMsg('ai',t('dyn.copyfail'));});}
@@ -1803,6 +1928,17 @@ var LIVE=specFeature({template:'caption',params:{}},
   tts_intro:{ko:'라이브 점자 자막입니다. 지금부터 말하면 그래픽 영역에 점자로 실시간 표시됩니다. 화면이 차면 자동으로 넘어갑니다. F1은 지우기, F2는 일시정지와 재개입니다.',en:'Live braille caption. Speak now and it appears in braille in real time. The display scrolls when full. F1 clears, F2 pauses and resumes.'}});
 library.push(DEMO);library.push(DICE);library.push(CLOCK);library.push(RPS);library.push(MAZE);library.push(SINE);library.push(LIVE);
 loadFeature(DEMO,false);renderLibrary();
+(function bootStatus(){   // #6 초기 세팅 상태: 자유 입력(AI) 가능 여부를 부팅 시 1회 안내
+  try{
+    var hasApi=!!(SD.cfg.api&&SD.cfg.api.trim());
+    if(!hasApi){
+      addMsg('ai','<span class="small">'+ (LANG==='en'
+        ? 'Offline-ready: chips, library and keyword requests (e.g. "bar chart 32 45 28", "3 minute timer") work without a connection. For free-form requests, set a proxy API endpoint in SETUP.'
+        : '오프라인 동작: 칩·라이브러리·키워드 요청("막대 차트 32 45 28", "3분 타이머" 등)은 연결 없이 됩니다. 자유 입력을 쓰려면 SETUP에서 프록시 API 엔드포인트를 설정하세요.')
+        +'</span>');
+    }
+  }catch(e){}
+})();
 
 /* ═══════════ DEPLOY EDITION: SETTINGS ═══════════ */
 /* ══════════ i18n — 한/영 토글 (해외 시연팀용) ══════════ */
@@ -1823,7 +1959,7 @@ var I18N={
   'build.greetEx':'예: "이번 분기 매출을 막대그래프로" &middot; "주사위 굴리기" &middot; "현재 시각을 점자로" &middot; "간단한 미로 게임"',
   'build.ph':"원하는 기능을 자연어로 입력...  (생성 후 같은 칸에서 수정 요청 가능: '막대를 더 두껍게')",
   'build.gen':'기능 생성','build.new':'새 맥락',
-  'lib.title':'기능 라이브러리','lib.import':'가져오기','lib.export':'내보내기','lib.empty':'데모 기능이 시뮬레이터에 로드됨',
+  'lib.title':'기능 라이브러리','lib.import':'가져오기','lib.export':'내보내기','lib.share':'링크 공유','lib.empty':'데모 기능이 시뮬레이터에 로드됨',
   'sim.sync':'정렬 테스트','con.title':'TTS · 이벤트 콘솔','con.tts':'TTS 켜짐','con.code':'런타임 코드 보기',
   'dyn.demo':'내장 데모 — API 연결 없이 동작. 수정하려면 자연어로 요청하세요.',
   'dyn.retry':'1차 시도 실패 — 더 단순한 버전으로 자동 재시도 중…',
@@ -1853,7 +1989,7 @@ var I18N={
   'build.greetEx':'e.g. "quarterly sales as a bar chart" · "roll a dice" · "current time in braille" · "a simple maze game"',
   'build.ph':"Type the feature you want in plain language...  (after generating, refine in the same box: 'make the bars thicker')",
   'build.gen':'Generate','build.new':'New context',
-  'lib.title':'FEATURE LIBRARY','lib.import':'IMPORT','lib.export':'EXPORT','lib.empty':'Demo feature loaded in the simulator',
+  'lib.title':'FEATURE LIBRARY','lib.import':'IMPORT','lib.export':'EXPORT','lib.share':'SHARE LINK','lib.empty':'Demo feature loaded in the simulator',
   'sim.sync':'SYNC TEST','con.title':'TTS · EVENT CONSOLE','con.tts':'TTS ON','con.code':'VIEW RUNTIME CODE',
   'dyn.demo':'Built-in demo — runs without an API connection. Refine it in natural language.',
   'dyn.retry':'First attempt failed — automatically retrying with a simpler version…',
@@ -1877,6 +2013,7 @@ function applyLang(){
   document.querySelectorAll('.chip[data-ko]').forEach(function(c){c.textContent=(LANG==='en'?c.getAttribute('data-en'):c.getAttribute('data-ko'));});
   document.documentElement.lang=LANG;
   var lb=document.getElementById('langBtn');if(lb)lb.textContent=(LANG==='en'?'KO':'EN');
+  try{if(typeof applyKeymap==='function'&&window.currentFeature)applyKeymap(currentFeature.spec?currentFeature.spec.template:null);}catch(e){}
   // TTS 버튼 상태 텍스트가 켜짐/꺼짐을 반영 중이면 현재 상태 유지하며 언어만 교체
 }
 function setLang(l){LANG=l;try{localStorage.setItem('sd_lang',l);}catch(e){}TTSV.locked=false;if(typeof refreshVoices==='function')refreshVoices();applyLang();}
@@ -1898,10 +2035,11 @@ var SD={
   var fApi=document.getElementById('cfgApi'),fSvc=document.getElementById('cfgSvc'),fChr=document.getElementById('cfgChr'),fEnc=document.getElementById('cfgEnc'),fWr=document.getElementById('cfgWrite'),fGr=document.getElementById('cfgGrade');
   var fEng=document.getElementById('cfgEngine'),llStat=document.getElementById('llStat'),brlIn=document.getElementById('brlIn'),brlGo=document.getElementById('brlGo'),brlOut=document.getElementById('brlOut');
   var fVoice=document.getElementById('cfgVoice');
-  var fVol=document.getElementById('cfgVol'),fVolMic=document.getElementById('cfgVolMic');
+  var fVol=document.getElementById('cfgVol'),fVolMic=document.getElementById('cfgVolMic'),fRate=document.getElementById('cfgRate');
+  var rateVal=document.getElementById('rateVal'),voiceWarn=document.getElementById('voiceWarn');
   var volVal=document.getElementById('volVal'),volMicVal=document.getElementById('volMicVal');
-  function volLabels(){volVal.textContent=fVol.value+'%';volMicVal.textContent=fVolMic.value+'%';}
-  fVol.addEventListener('input',volLabels);fVolMic.addEventListener('input',volLabels);
+  function volLabels(){volVal.textContent=fVol.value+'%';volMicVal.textContent=fVolMic.value+'%';if(rateVal)rateVal.textContent=(fRate.value/100).toFixed(2)+'x';}
+  fVol.addEventListener('input',volLabels);fVolMic.addEventListener('input',volLabels);fRate.addEventListener('input',volLabels);
   function fillVoices(){
     refreshVoices();
     while(fVoice.options.length>1)fVoice.remove(1);
@@ -1911,6 +2049,10 @@ var SD={
       fVoice.appendChild(o);
     }
     fVoice.value=SD.cfg.voice||'';
+    if(voiceWarn){
+      if(!TTSV.list.length){voiceWarn.style.display='';voiceWarn.textContent=(LANG==='en'?'No '+(LANG==='en'?'English':'Korean')+' voice installed on this device — speech may fall back to another language. Install a voice in your OS settings before the demo.':'이 기기에 '+(LANG==='en'?'영어':'한국어')+' 음성이 없습니다 — 다른 언어 음성으로 대체될 수 있습니다. 시연 전 OS 설정에서 음성을 설치하세요.');}
+      else voiceWarn.style.display='none';
+    }
   }
   document.getElementById('voiceTest').addEventListener('click',function(){
     var prev=SD.cfg.voice;SD.cfg.voice=fVoice.value;TTSV.locked=false;refreshVoices();
@@ -1944,7 +2086,7 @@ var SD={
     fApi.value=SD.cfg.api||'';fSvc.value=SD.cfg.svc||'';fChr.value=SD.cfg.chr||'';
     fEnc.value=SD.cfg.enc||'cells';fWr.value=SD.cfg.write||'nores-20';fGr.value=SD.cfg.grade||'g2';
     fEng.value=SD.cfg.engine||'builtin';updateLL();fillVoices();
-    fVol.value=SD.cfg.vol!=null?SD.cfg.vol:100;fVolMic.value=SD.cfg.volMic!=null?SD.cfg.volMic:50;volLabels();
+    fVol.value=SD.cfg.vol!=null?SD.cfg.vol:100;fVolMic.value=SD.cfg.volMic!=null?SD.cfg.volMic:50;fRate.value=SD.cfg.rate!=null?SD.cfg.rate:105;volLabels();
     bg.classList.add('open');
   }
   function close(){bg.classList.remove('open');}
@@ -1955,7 +2097,7 @@ var SD={
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&bg.classList.contains('open'))close();});
   document.getElementById('cfgSave').addEventListener('click',function(){
     SD.cfg.api=fApi.value.trim();SD.cfg.svc=fSvc.value.trim().toLowerCase();SD.cfg.chr=fChr.value.trim().toLowerCase();
-    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.cfg.engine=fEng.value;SD.cfg.voice=fVoice.value;SD.cfg.vol=parseInt(fVol.value,10);SD.cfg.volMic=parseInt(fVolMic.value,10);refreshVoices();SD.save();close();
+    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.cfg.engine=fEng.value;SD.cfg.voice=fVoice.value;SD.cfg.vol=parseInt(fVol.value,10);SD.cfg.volMic=parseInt(fVolMic.value,10);SD.cfg.rate=parseInt(fRate.value,10);refreshVoices();SD.save();close();
     if(SD.cfg.engine==='liblouis'&&LL.status!=='ready'){
       LL.load(function(ok3){updateLL();logRow('<span class="key">[SETUP] '+escapeHtml(llStatText())+'</span>');if(ok3&&currentFeature)loadFeature(currentFeature,false);});
     }
@@ -2120,6 +2262,7 @@ var BLE={
   },
 
   disconnect:function(){
+    BLE.userClosed=true;     // 사용자가 직접 끊음 — 자동 재연결 안 함
     try{
       if(BLE.mode==='sdk'&&BLE.sdk)BLE.sdk.disconnect(BLE.dev);
       else if(BLE.device&&BLE.device.gatt.connected)BLE.device.gatt.disconnect();
@@ -2128,11 +2271,31 @@ var BLE={
   },
 
   onDisconnect:function(){
+    var wasConnected=BLE.connected;
     BLE.ready=false;BLE.stopKeepalive();
     BLE.connected=false;BLE.mode=null;BLE.dev=null;BLE.chr=null;BLE.pendingBuf=null;BLE.busy=false;
     var btn=document.getElementById('bleBtn');
-    btn.textContent='BLE CONNECT';btn.className='navbtn';
+    btn.textContent=(typeof t==='function'?t('nav.ble'):'BLE CONNECT');btn.className='navbtn';
     document.getElementById('modeBadge').textContent='SIMULATOR';
+    if(wasConnected&&!BLE.userClosed){
+      // 의도치 않은 끊김 — 1회 자동 재연결 시도(같은 기기 권한이 남아 있으면 재선택 없이 재연결)
+      if(typeof announce==='function')announce(LANG==='en'?'DotPad disconnected — reconnecting':'닷패드 연결 끊김 — 재연결 시도');
+      logRow('<span class="key">[BLE] '+(LANG==='en'?'Disconnected unexpectedly — attempting to reconnect…':'예기치 않게 끊김 — 재연결을 시도합니다…')+'</span>');
+      if(BLE.device&&BLE.device.gatt&&!BLE._reconnecting){
+        BLE._reconnecting=true;
+        setTimeout(function(){
+          BLE.device.gatt.connect().then(function(){
+            BLE._reconnecting=false;
+            logRow('<span class="key">[BLE] '+(LANG==='en'?'Reconnected.':'재연결되었습니다.')+'</span>');
+            // SDK 경로 재초기화는 사용자가 다시 CONNECT를 누르도록 안내(자동 SDK 재바인딩은 위험)
+          }).catch(function(){
+            BLE._reconnecting=false;
+            logErr(LANG==='en'?'Reconnect failed — press BLE CONNECT to retry.':'재연결 실패 — BLE CONNECT를 다시 눌러주세요.');
+          });
+        },800);
+      }
+    }
+    BLE.userClosed=false;
   },
 
   /* SDK는 전송이 1.5초 멈추면 LIVE 리프레시(터치된 행 재구동 3회)를 예약한다.
@@ -2298,7 +2461,7 @@ document.getElementById('syncBtn').addEventListener('click',function(){
     if(window.currentDP&&currentDP.stopListen){
       try{currentDP.stopListen();logRow('<span class="key">[MIC] 기능의 음성 인식을 중지하고 받아쓰기를 시작합니다</span>');}catch(e){}
     }
-    rec=new SR();rec.lang='ko-KR';rec.interimResults=false;rec.maxAlternatives=1;
+    rec=new SR();rec.lang=(LANG==='en'?'en-US':'ko-KR');rec.interimResults=false;rec.maxAlternatives=1;
     rec.onstart=function(){listening=true;micActive(true);micBtn.textContent='REC \u25CF';micBtn.classList.add('rec');micBtn.setAttribute('aria-pressed','true');};
     rec.onresult=function(e){
       var t=e.results[0][0].transcript;
@@ -2332,21 +2495,38 @@ document.getElementById('syncBtn').addEventListener('click',function(){
 
 /* ═══════════ DEPLOY EDITION: LIBRARY IMPORT ═══════════ */
 document.getElementById('importBtn').addEventListener('click',function(){
-  var raw=prompt('EXPORT로 복사했던 라이브러리 JSON을 붙여넣으세요:');
+  var raw=prompt(LANG==='en'?'Paste the library JSON you exported (or a shared link):':'EXPORT로 복사한 라이브러리 JSON을 붙여넣으세요 (또는 공유 링크):');
   if(!raw)return;
+  raw=raw.trim();
   try{
+    // 공유 링크(#lib=...)면 해시 부분만 추출해 복원
+    var hashIdx=raw.indexOf('#lib=');
+    if(hashIdx>=0){importFromHash(raw.slice(hashIdx+5));return;}
     var arr=JSON.parse(raw);
-    if(!Array.isArray(arr))throw new Error('배열이 아닙니다');
-    var added=0;
-    arr.forEach(function(f){
-      if(!f||!f.code)return;
-      if(library.some(function(x){return x.id===f.id;}))return;
-      library.push(f);added++;
-    });
-    renderLibrary();
-    addMsg('ai',t('dyn.importedPre')+added+t('dyn.imported'));
+    if(!Array.isArray(arr))throw new Error(LANG==='en'?'not an array':'배열이 아닙니다');
+    mergeLibrary(arr);
   }catch(e){logErr(t('dyn.importfail')+e.message);}
 });
+function mergeLibrary(arr){
+  var added=0;
+  arr.forEach(function(f){
+    if(!f||(!f.code&&!f.spec))return;          // 스펙 기능(spec)도 허용 — 이전엔 code만 받아 스펙 기능이 전부 누락됐음
+    if(library.some(function(x){return x.id===f.id;}))return;
+    library.push(f);added++;
+  });
+  renderLibrary();
+  addMsg('ai',t('dyn.importedPre')+added+t('dyn.imported'));
+}
+function importFromHash(b64){
+  try{
+    var json=decodeURIComponent(escape(atob(b64.replace(/-/g,'+').replace(/_/g,'/'))));
+    var arr=JSON.parse(json);
+    if(!Array.isArray(arr))throw new Error('bad');
+    mergeLibrary(arr);
+  }catch(e){logErr(t('dyn.importfail')+(LANG==='en'?'invalid link':'잘못된 링크'));}
+}
+// 부팅 시 URL 해시에 공유 라이브러리가 있으면 자동 로드
+(function(){try{var h=location.hash;if(h&&h.indexOf('#lib=')===0){importFromHash(h.slice(5));}}catch(e){}})();
 
 /* ═══════════ DEPLOY EDITION: TTS MUTE TOGGLE ═══════════ */
 (function(){
