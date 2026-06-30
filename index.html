@@ -227,7 +227,8 @@
   <div class="navstatus">
     <span>60 &times; 40 BINARY</span>
     <span class="live" id="modeBadge">SIMULATOR</span>
-    <button class="navbtn" id="bleBtn" data-i18n="nav.ble">BLE CONNECT</button>
+    <button class="navbtn" id="bleBtn" data-i18n="nav.ble">기기 추가</button>
+    <button class="navbtn" id="bleMultiBtn" data-i18n="nav.bleMulti" title="여러 대에 동시 미러링">기기 여러 대 추가</button>
     <button class="navbtn" id="setBtn" title="API / BLE 설정" data-i18n="nav.setup">SETUP</button>
     <button class="navbtn" id="langBtn" title="Language / 언어" aria-label="Language">EN</button>
   </div>
@@ -2240,7 +2241,7 @@ loadFeature(DEMO,false);renderLibrary();
 var I18N={
  ko:{
   'skip':'본문 바로가기 — 기능 생성',
-  'nav.build':'BUILD','nav.sim':'SIMULATOR','nav.console':'CONSOLE','nav.ble':'BLE 연결','nav.setup':'설정',
+  'nav.build':'BUILD','nav.sim':'SIMULATOR','nav.console':'CONSOLE','nav.ble':'기기 추가','nav.bleMulti':'기기 여러 대 추가','nav.setup':'설정',
   'hero.eyebrow':'생각한 것을, 지금 바로.',
   'hero.sub':'원하는 기능을 입력하면, DotPad가 그 자리에서 보여줍니다. 기다림도, "검토해보겠습니다"도 없이.',
   'hero.cta1':'기능 생성하기','hero.cta2':'시뮬레이터 보기','hero.scroll':'스크롤 &darr;',
@@ -2270,7 +2271,7 @@ var I18N={
  },
  en:{
   'skip':'Skip to main — Feature Builder',
-  'nav.build':'BUILD','nav.sim':'SIMULATOR','nav.console':'CONSOLE','nav.ble':'BLE CONNECT','nav.setup':'SETUP',
+  'nav.build':'BUILD','nav.sim':'SIMULATOR','nav.console':'CONSOLE','nav.ble':'Add device','nav.bleMulti':'Add devices','nav.setup':'SETUP',
   'hero.eyebrow':'What you imagine, right now.',
   'hero.sub':'Type the feature you want, and DotPad shows it on the spot. No waiting, no "we&rsquo;ll look into it."',
   'hero.cta1':'Build a feature','hero.cta2':'Open simulator','hero.scroll':'SCROLL &darr;',
@@ -2424,17 +2425,14 @@ var SD={
    2순위: SDK 파일이 없으면 raw GATT 폴백(SETUP의 UUID 사용)                                   */
 var BLE={
   connected:false, mode:null,                 // 'sdk' | 'raw'
-  sdkMod:null, sdk:null, scanner:null, dev:null,   // sdk mode
-  device:null, chr:null,                      // raw mode
-  busy:false, last:0, pendingBuf:null, lastSent:null,
-  MIN_INTERVAL:200,                           // ms between frame pushes
+  sdkMod:null, sdk:null, scanner:null,        // sdk mode
+  devs:[],                                    // SDK 다중 기기(미러링): [{dev,name,ready,lastSent,lastTextHex}]
+  MAX:5,                                      // 동시 미러링 최대 대수
+  device:null, chr:null, rawLastSent:null,    // raw mode (단일 전용)
+  ready:false, busy:false, last:0, pendingBuf:null,
+  MIN_INTERVAL:200, DM:null, _ka:null, _textWarned:false, userClosed:false, _reconnecting:false,
 
-  /* ---------- shared: frame encoding ---------- */
-  /* 60x40 -> 300 bytes (30x10 cells, row-major).
-     'cells'  : DotPad 그래픽 표준 — 셀 내 좌열 위→아래 bit0–3, 우열 위→아래 bit4–7
-                (bit = y%4 + (x%2)*4)
-     'braille': 점자 도트 1–8 순서(1,2,3,7 / 4,5,6,8) — 검증/비교용
-     'rows'   : row-major bit packing — raw 폴백 전용 */
+  /* ---------- frame encoding (검증된 인코딩 — 변경 금지) ---------- */
   encodeFrame:function(buf){
     var out=new Uint8Array(300);
     var mode=SD.cfg.enc||'cells';
@@ -2444,24 +2442,23 @@ var BLE={
       var ci=0;
       for(var cy=0;cy<10;cy++)for(var cxx=0;cxx<30;cxx++){
         var bx=cxx*2,by=cy*4,b=0;
-        if(buf[(by  )*60+bx  ])b|=0x01;  // dot1
-        if(buf[(by+1)*60+bx  ])b|=0x02;  // dot2
-        if(buf[(by+2)*60+bx  ])b|=0x04;  // dot3
-        if(buf[(by  )*60+bx+1])b|=0x08;  // dot4
-        if(buf[(by+1)*60+bx+1])b|=0x10;  // dot5
-        if(buf[(by+2)*60+bx+1])b|=0x20;  // dot6
-        if(buf[(by+3)*60+bx  ])b|=0x40;  // dot7
-        if(buf[(by+3)*60+bx+1])b|=0x80;  // dot8
+        if(buf[(by  )*60+bx  ])b|=0x01;
+        if(buf[(by+1)*60+bx  ])b|=0x02;
+        if(buf[(by+2)*60+bx  ])b|=0x04;
+        if(buf[(by  )*60+bx+1])b|=0x08;
+        if(buf[(by+1)*60+bx+1])b|=0x10;
+        if(buf[(by+2)*60+bx+1])b|=0x20;
+        if(buf[(by+3)*60+bx  ])b|=0x40;
+        if(buf[(by+3)*60+bx+1])b|=0x80;
         out[ci++]=b;
       }
     }else{
-      // 'cells' — DotPad graphic standard (column-sequential bits)
       var ci2=0;
       for(var gy=0;gy<10;gy++)for(var gx=0;gx<30;gx++){
         var px=gx*2,py=gy*4,bb=0;
         for(var r=0;r<4;r++){
-          if(buf[(py+r)*60+px  ])bb|=(1<<r);      // left column: bit0..3 top->bottom
-          if(buf[(py+r)*60+px+1])bb|=(1<<(r+4));  // right column: bit4..7 top->bottom
+          if(buf[(py+r)*60+px  ])bb|=(1<<r);
+          if(buf[(py+r)*60+px+1])bb|=(1<<(r+4));
         }
         out[ci2++]=bb;
       }
@@ -2483,39 +2480,45 @@ var BLE={
     return p.then(function(m){BLE.sdkMod=m;return m;});
   },
 
-  /* ---------- connect ---------- */
-  connect:function(){
+  /* ---------- connect / add device ---------- */
+  connect:function(){BLE.addDevice();},
+  addDevice:function(){
     if(!navigator.bluetooth){logErr('이 브라우저는 Web Bluetooth를 지원하지 않습니다. Chrome/Edge(HTTPS)에서 열어주세요.');return;}
+    if(BLE.mode==='raw'){logErr('raw 폴백 모드에서는 1대만 지원합니다(다중 미러링은 DotPadSDK 필요).');return;}
+    if(BLE.devs.length>=BLE.MAX){logErr('최대 '+BLE.MAX+'대까지 연결할 수 있습니다.');return;}
     var btn=document.getElementById('bleBtn');
-    btn.textContent='CONNECTING\u2026';btn.className='navbtn busy';
+    if(btn){btn.textContent='CONNECTING…';btn.className='navbtn busy';}
     BLE.loadSDK().then(
-      function(m){BLE.sdkConnect(m);},
+      function(m){BLE.sdkAdd(m);},
       function(){
+        if(BLE.devs.length){logErr('SDK를 찾지 못해 기기를 추가할 수 없습니다.');BLE.refreshBtn();return;}
         logRow('<span class="key">[BLE] DotPadSDK 파일을 찾지 못했습니다. raw GATT 폴백으로 전환합니다.</span>');
         BLE.rawConnect();
       }
     );
   },
-
-  sdkConnect:function(m){
+  sdkAdd:function(m){
     BLE.sdk=BLE.sdk||new m.DotPadSDK();
     BLE.scanner=BLE.scanner||new m.DotPadScanner();
-    BLE.DM=m.DisplayMode;BLE.ready=false;
+    BLE.DM=m.DisplayMode;
     BLE.sdk.setCallBack(BLE.onMessage,BLE.onKey);
     BLE.scanner.startBleScan().then(function(d){
       if(!d)throw new Error('기기를 선택하지 않았습니다');
       return BLE.sdk.connectBleDevice(d);
     }).then(function(dev){
       if(!dev)throw new Error('SDK 연결 실패');
-      BLE.dev=dev;BLE.mode='sdk';BLE.connected=true;BLE.lastSent=null;BLE.lastTextHex=null;
-      BLE.uiConnected('DOTPAD (SDK)');
-      logRow('<span class="key">[BLE] DotPadSDK 연결됨 \u00B7 cell '+dev.numberCellColumns+'\u00D7'+dev.numberCellRows+' \u00B7 하드웨어 키 입력 활성</span>');
-      if(BLE.ready){BLE.push(frameBuf);BLE.pushText(textBuf);}   // Connected가 먼저 도착한 경우
+      if(BLE.devs.some(function(e){return e.dev===dev;})){BLE.refreshBtn();return;}
+      var en={dev:dev,name:(dev.deviceName||dev.name||'DOTPAD')+' #'+(BLE.devs.length+1),ready:false,lastSent:null,lastTextHex:null};
+      BLE.devs.push(en);BLE.mode='sdk';BLE.connected=true;
+      if(!BLE._ka)BLE.startKeepalive();
+      BLE.uiConnected();BLE.renderList();
+      logRow('<span class="key">[BLE] 연결됨 ('+BLE.devs.length+'/'+BLE.MAX+'대) · cell '+dev.numberCellColumns+'×'+dev.numberCellRows+'</span>');
+      // 안전망: BoardInfo(Connected)를 1.5초 안에 못 받으면 강제 동기화
+      setTimeout(function(){if(BLE.connected&&BLE.ready&&!en.ready){en.ready=true;en.lastSent=null;en.lastTextHex=null;BLE.push(frameBuf);BLE.pushText(textBuf);}},1500);
     }).catch(function(e){
-      logErr('BLE 연결 실패: '+e.message);BLE.onDisconnect();
+      logErr('BLE 연결 실패: '+e.message);BLE.refreshBtn();
     });
   },
-
   rawConnect:function(){
     var svc=(SD.cfg.svc&&SD.cfg.svc.trim())||'49535343-fe7d-4ae5-8fa9-9fafd205e455';
     navigator.bluetooth.requestDevice({
@@ -2523,89 +2526,108 @@ var BLE={
       optionalServices:[svc]
     }).then(function(device){
       BLE.device=device;
-      device.addEventListener('gattserverdisconnected',BLE.onDisconnect);
+      device.addEventListener('gattserverdisconnected',BLE.onRawDisconnect);
       return device.gatt.connect();
     }).then(function(server){
       return server.getPrimaryService(svc);
     }).then(function(service){
       return service.getCharacteristics().then(function(chs){
-        var lines=chs.map(function(ch){
-          var p=ch.properties,props=[];
-          if(p.write)props.push('write');if(p.writeWithoutResponse)props.push('writeNR');
-          if(p.notify)props.push('notify');if(p.read)props.push('read');
-          return ch.uuid+' ['+props.join(',')+']';
-        });
-        logRow('<span class="key">[BLE] 특성 '+chs.length+'개: '+escapeHtml(lines.join(' | '))+'</span>');
         var target=null;
         if(SD.cfg.chr)target=chs.find(function(ch){return ch.uuid===SD.cfg.chr;});
         if(!target)target=chs.find(function(ch){return ch.properties.writeWithoutResponse||ch.properties.write;});
         if(!target)throw new Error('쓰기 가능한 특성을 찾지 못했습니다');
-        BLE.chr=target;BLE.mode='raw';BLE.connected=true;BLE.lastSent=null;
-        BLE.uiConnected(BLE.device.name||'DOTPAD');
-        logRow('<span class="key">[BLE] raw 연결됨: '+escapeHtml(BLE.device.name||'(이름 없음)')+' / '+escapeHtml(target.uuid)+'</span>');
+        BLE.chr=target;BLE.mode='raw';BLE.connected=true;BLE.rawLastSent=null;
+        BLE.uiConnected();BLE.renderList();
+        logRow('<span class="key">[BLE] raw 연결됨: '+escapeHtml(BLE.device.name||'(이름 없음)')+'</span>');
         BLE.push(frameBuf);
       });
     }).catch(function(e){
-      logErr('BLE 연결 실패: '+e.message);BLE.onDisconnect();
+      logErr('BLE 연결 실패: '+e.message);BLE.onDisconnect(true);
     });
   },
 
-  uiConnected:function(label){
-    var btn=document.getElementById('bleBtn');
-    btn.textContent='BLE \u00B7 '+label;btn.className='navbtn on';
-    document.getElementById('modeBadge').textContent='LIVE \u00B7 DOTPAD';
+  /* ---------- UI ---------- */
+  refreshBtn:function(){
+    var btn=document.getElementById('bleBtn');if(!btn)return;
+    if(BLE.connected){var n=(BLE.mode==='raw'?1:BLE.devs.length);btn.textContent='BLE · '+n+(LANG==='en'?'':'대')+(BLE.mode==='raw'?' raw':'');btn.className='navbtn on';}
+    else{btn.textContent=(typeof t==='function'?t('nav.ble'):'기기 추가');btn.className='navbtn';}
+  },
+  uiConnected:function(){
+    BLE.refreshBtn();
+    var n=(BLE.mode==='raw'?1:BLE.devs.length);
+    var mb=document.getElementById('modeBadge');if(mb)mb.textContent='LIVE · '+n+(LANG==='en'?(' DOTPAD'+(n>1?'S':'')):'대');
+  },
+  renderList:function(){
+    var el=document.getElementById('bleDevList');
+    if(!BLE.connected){if(el)el.remove();return;}
+    if(!el){el=document.createElement('div');el.id='bleDevList';
+      el.style.cssText='position:fixed;top:52px;right:12px;z-index:80;background:#0a0a0a;border:1px solid #333;padding:10px 12px;font:11px/1.5 ui-monospace,monospace;color:#ddd;max-width:260px;border-radius:6px';
+      document.body.appendChild(el);}
+    var n=(BLE.mode==='raw'?1:BLE.devs.length);
+    var head='<div style="letter-spacing:.08em;color:#8a8a8a;margin-bottom:6px">연결 기기 '+n+'/'+BLE.MAX+(BLE.mode==='raw'?' · raw':'')+'</div>';
+    var rows;
+    if(BLE.mode==='raw'){rows='<div>'+escapeHtml((BLE.device&&BLE.device.name)||'DOTPAD')+'</div>';}
+    else{rows=BLE.devs.map(function(en,i){
+      return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin:2px 0"><span>'+(i+1)+'. '+escapeHtml(en.name)+(en.ready?'':' <em style="color:#caa">준비중</em>')+'</span><button data-i="'+i+'" class="bleRm" style="cursor:pointer;background:#311;color:#f9a;border:1px solid #633;border-radius:3px;font:10px monospace;padding:1px 6px">끊기</button></div>';
+    }).join('');}
+    el.innerHTML=head+rows+'<div style="margin-top:8px;text-align:right"><button id="bleAllOff" style="cursor:pointer;background:#222;color:#ddd;border:1px solid #444;border-radius:3px;font:10px monospace;padding:2px 8px">모두 끊기</button></div>';
+    Array.prototype.forEach.call(el.querySelectorAll('.bleRm'),function(b){b.addEventListener('click',function(){BLE.disconnectOne(+b.getAttribute('data-i'));});});
+    var off=el.querySelector('#bleAllOff');if(off)off.addEventListener('click',function(){BLE.disconnect();});
   },
 
+  /* ---------- disconnect ---------- */
   disconnect:function(){
-    BLE.userClosed=true;     // 사용자가 직접 끊음 — 자동 재연결 안 함
+    BLE.userClosed=true;
     try{
-      if(BLE.mode==='sdk'&&BLE.sdk)BLE.sdk.disconnect(BLE.dev);
-      else if(BLE.device&&BLE.device.gatt.connected)BLE.device.gatt.disconnect();
+      if(BLE.mode==='sdk'&&BLE.sdk){BLE.devs.forEach(function(en){try{BLE.sdk.disconnect(en.dev);}catch(e){}});}
+      else if(BLE.device&&BLE.device.gatt.connected){BLE.device.gatt.disconnect();}
     }catch(e){}
-    BLE.onDisconnect();
+    BLE.onDisconnect(true);
   },
-
-  onDisconnect:function(){
-    var wasConnected=BLE.connected;
-    BLE.ready=false;BLE.stopKeepalive();
-    BLE.connected=false;BLE.mode=null;BLE.dev=null;BLE.chr=null;BLE.pendingBuf=null;BLE.busy=false;
-    var btn=document.getElementById('bleBtn');
-    btn.textContent=(typeof t==='function'?t('nav.ble'):'BLE CONNECT');btn.className='navbtn';
-    document.getElementById('modeBadge').textContent='SIMULATOR';
-    if(wasConnected&&!BLE.userClosed){
-      // 의도치 않은 끊김 — 1회 자동 재연결 시도(같은 기기 권한이 남아 있으면 재선택 없이 재연결)
+  disconnectOne:function(idx){
+    var en=BLE.devs[idx];if(!en)return;
+    try{if(BLE.sdk)BLE.sdk.disconnect(en.dev);}catch(e){}
+    BLE.devs.splice(idx,1);
+    logRow('<span class="key">[BLE] 기기 1대 해제 (남은 '+BLE.devs.length+'대)</span>');
+    if(!BLE.devs.length){BLE.onDisconnect(true);return;}
+    BLE.uiConnected();BLE.renderList();
+  },
+  removeDevice:function(device){
+    var i=-1;for(var k=0;k<BLE.devs.length;k++)if(BLE.devs[k].dev===device){i=k;break;}
+    if(i>=0){BLE.devs.splice(i,1);logRow('<span class="key">[BLE] 기기 연결 해제 (남은 '+BLE.devs.length+'대)</span>');}
+    if(!BLE.devs.length)BLE.onDisconnect(true);
+    else{BLE.uiConnected();BLE.renderList();}
+  },
+  onDisconnect:function(full){
+    BLE.ready=false;
+    if(full){BLE.stopKeepalive();BLE.connected=false;BLE.mode=null;BLE.device=null;BLE.chr=null;BLE.devs=[];BLE.pendingBuf=null;BLE.busy=false;}
+    BLE.refreshBtn();BLE.renderList();
+    var mb=document.getElementById('modeBadge');if(mb)mb.textContent='SIMULATOR';
+    BLE.userClosed=false;
+  },
+  onRawDisconnect:function(){
+    var was=BLE.connected;BLE.ready=false;BLE.connected=false;BLE.mode=null;BLE.chr=null;BLE.busy=false;
+    BLE.refreshBtn();BLE.renderList();var mb=document.getElementById('modeBadge');if(mb)mb.textContent='SIMULATOR';
+    if(was&&!BLE.userClosed&&BLE.device&&BLE.device.gatt&&!BLE._reconnecting){
+      BLE._reconnecting=true;
       if(typeof announce==='function')announce(LANG==='en'?'DotPad disconnected — reconnecting':'닷패드 연결 끊김 — 재연결 시도');
-      logRow('<span class="key">[BLE] '+(LANG==='en'?'Disconnected unexpectedly — attempting to reconnect…':'예기치 않게 끊김 — 재연결을 시도합니다…')+'</span>');
-      if(BLE.device&&BLE.device.gatt&&!BLE._reconnecting){
-        BLE._reconnecting=true;
-        setTimeout(function(){
-          BLE.device.gatt.connect().then(function(){
-            BLE._reconnecting=false;
-            logRow('<span class="key">[BLE] '+(LANG==='en'?'Reconnected.':'재연결되었습니다.')+'</span>');
-            // SDK 경로 재초기화는 사용자가 다시 CONNECT를 누르도록 안내(자동 SDK 재바인딩은 위험)
-          }).catch(function(){
-            BLE._reconnecting=false;
-            logErr(LANG==='en'?'Reconnect failed — press BLE CONNECT to retry.':'재연결 실패 — BLE CONNECT를 다시 눌러주세요.');
-          });
-        },800);
-      }
+      setTimeout(function(){
+        BLE.device.gatt.connect().then(function(){BLE._reconnecting=false;logRow('<span class="key">[BLE] 재연결되었습니다.</span>');})
+        .catch(function(){BLE._reconnecting=false;logErr('재연결 실패 — 기기 추가를 다시 눌러주세요.');});
+      },800);
     }
     BLE.userClosed=false;
   },
 
-  /* SDK는 전송이 1.5초 멈추면 LIVE 리프레시(터치된 행 재구동 3회)를 예약한다.
-     setRefreshMode 호출은 그 타이머를 취소하므로, 마지막 프레임과 '동일한' 1행 데이터를
-     1초마다 displayLineData로 재호출하면 — 데이터가 같아 BLE 패킷은 전혀 나가지 않으면서 —
-     재구동 사이클이 영구 보류되어 핀 들락거림이 사라진다. */
-  _ka:null,
+  /* ---------- keep-alive (전 기기, 동일 데이터라 실제 패킷은 거의 안 나감) ---------- */
   startKeepalive:function(){
     BLE.stopKeepalive();
     BLE._ka=setInterval(function(){
-      if(!BLE.connected||!BLE.ready||BLE.mode!=='sdk'||!BLE.lastSent||!BLE.DM)return;
-      try{
-        var COLS=30,rowHex=BLE.toHex(BLE.lastSent.slice(0,COLS));
-        BLE.sdk.displayLineData(1,0,rowHex,BLE.DM.GraphicMode,BLE.dev);
-      }catch(e){}
+      if(BLE.mode!=='sdk'||!BLE.DM)return;
+      BLE.devs.forEach(function(en){
+        if(!en.ready||!en.lastSent)return;
+        try{var COLS=30,rowHex=BLE.toHex(en.lastSent.slice(0,COLS));BLE.sdk.displayLineData(1,0,rowHex,BLE.DM.GraphicMode,en.dev);}catch(e){}
+      });
     },1000);
   },
   stopKeepalive:function(){if(BLE._ka){clearInterval(BLE._ka);BLE._ka=null;}},
@@ -2613,47 +2635,47 @@ var BLE={
   /* ---------- SDK callbacks ---------- */
   onMessage:function(device,code,msg){
     if(code==='Connected'){
-      // 보드 정보 수신 완료 — 이 시점부터 그래픽/텍스트 라인 전송이 유효
-      BLE.ready=true;BLE.lastSent=null;BLE.lastTextHex=null;
-      announce('닷패드 연결 완료');logRow('<span class="key">[BLE] 디바이스 준비 완료(BoardInfo) \u00B7 출력 동기화</span>');
+      BLE.ready=true;
+      var en=null;for(var k=0;k<BLE.devs.length;k++)if(BLE.devs[k].dev===device)en=BLE.devs[k];
+      if(en){en.ready=true;en.lastSent=null;en.lastTextHex=null;}
+      else{BLE.devs.forEach(function(e){if(!e.ready){e.ready=true;e.lastSent=null;e.lastTextHex=null;}});}
+      announce('닷패드 연결 완료');logRow('<span class="key">[BLE] 디바이스 준비 완료(BoardInfo) · 출력 동기화</span>');
       if(BLE.connected){BLE.push(frameBuf);BLE.pushText(textBuf);}
-      BLE.startKeepalive();
+      if(!BLE._ka)BLE.startKeepalive();
     }
-    else if(code==='Disconnected'){announce('닷패드 연결 해제됨');logRow('<span class="key">[BLE] 연결 해제됨</span>');BLE.onDisconnect();}
-    else if(code==='ConnectedFail'){logErr('BLE 연결 실패: '+msg);BLE.onDisconnect();}
+    else if(code==='Disconnected'){
+      logRow('<span class="key">[BLE] 연결 해제됨</span>');
+      if(device)BLE.removeDevice(device);else BLE.onDisconnect(true);
+    }
+    else if(code==='ConnectedFail'){logErr('BLE 연결 실패: '+msg);BLE.refreshBtn();}
     else if(code==='CommandError'){logErr('DotPad 명령 오류: '+msg);}
   },
   onKey:function(device,keyCode,msg){
     var map={KeyFunction1:'F1',KeyFunction2:'F2',KeyFunction3:'F3',KeyFunction4:'F4',
              PanningLeft:'PAN_LEFT',PanningRight:'PAN_RIGHT'};
     var k=map[keyCode];
-    if(k){
-      logRow('<span class="key">[KEY\u00B7HW] '+k+'</span>');
-      if(currentDP)currentDP._fireKey(k);
-    }
+    if(k){logRow('<span class="key">[KEY·HW] '+k+'</span>');if(currentDP)currentDP._fireKey(k);}
   },
 
-  /* ---------- frame pushing (throttle + dedupe) ---------- */
+  /* ---------- frame pushing (throttle + dedupe + fan-out) ---------- */
   push:function(buf){
     if(!BLE.connected)return;
     BLE.pendingBuf=buf;
     BLE.pump();
   },
-
-  lastTextHex:null,_textWarned:false,ready:false,
   pushText:function(tbuf){
     if(!BLE.connected)return;
     if(BLE.mode==='sdk'){
-      if(!BLE.ready)return;                       // BoardInfo 전 — Connected 콜백이 재동기화함
+      if(!BLE.ready)return;
       var hex=BLE.toHex(tbuf);
-      if(hex===BLE.lastTextHex)return;
-      BLE.lastTextHex=hex;
-      try{
-        // displayTextData 대신 line0 LIVE 전송: TEXT_DISPLAY 모드가 그래픽 LIVE와 섞여
-        // ALL_DISPLAY로 승격 → 0~3행 재구동 사이클(윗행 플러터)이 도는 것을 차단
-        if(BLE.DM)BLE.sdk.displayLineData(0,0,hex,BLE.DM.TextMode,BLE.dev);
-        else BLE.sdk.displayTextData(hex,BLE.dev);
-      }catch(e){logErr('텍스트 라인 전송 오류: '+e.message);}
+      BLE.devs.forEach(function(en){
+        if(!en.ready||hex===en.lastTextHex)return;
+        en.lastTextHex=hex;
+        try{
+          if(BLE.DM)BLE.sdk.displayLineData(0,0,hex,BLE.DM.TextMode,en.dev);
+          else BLE.sdk.displayTextData(hex,en.dev);
+        }catch(e){logErr('텍스트 라인 전송 오류: '+e.message);}
+      });
     }else if(!BLE._textWarned){
       BLE._textWarned=true;
       logRow('<span class="key">[BLE] raw 폴백 모드에서는 텍스트 라인 전송이 지원되지 않습니다(SDK 필요)</span>');
@@ -2662,59 +2684,52 @@ var BLE={
   pump:function(){
     if(BLE.busy||!BLE.pendingBuf||!BLE.connected)return;
     var now=Date.now();
-    if(now-BLE.last<BLE.MIN_INTERVAL){
-      setTimeout(BLE.pump,BLE.MIN_INTERVAL-(now-BLE.last)+5);return;
-    }
+    var count=(BLE.mode==='sdk'?Math.max(1,BLE.devs.length):1);
+    var interval=BLE.MIN_INTERVAL*count;                 // 보호: 기기 수에 비례해 전송 간격 확대
+    if(now-BLE.last<interval){setTimeout(BLE.pump,interval-(now-BLE.last)+5);return;}
     var bytes=BLE.encodeFrame(BLE.pendingBuf);BLE.pendingBuf=null;
-    if(BLE.lastSent){
-      var same=true;
-      for(var i=0;i<300;i++)if(bytes[i]!==BLE.lastSent[i]){same=false;break;}
-      if(same)return;
-    }
-    var prev=BLE.lastSent;
-    BLE.lastSent=bytes;BLE.last=now;
+    BLE.last=now;
     if(BLE.mode==='sdk'){
-      if(!BLE.ready){BLE.lastSent=null;return;}   // BoardInfo 전 전송은 SDK가 무시 — Connected 후 재동기화
-      try{
-        var ROWS=10,COLS=30;
-        var rowsOk=BLE.dev&&BLE.dev.numberCellRows===ROWS&&BLE.dev.numberCellColumns===COLS;
-        if(!rowsOk||!BLE.DM){
-          BLE.sdk.displayGraphicData(BLE.toHex(bytes),BLE.dev);          // 비표준 셀 구성 전용 폴백
-        }else{
-          // 항상 행 단위 LIVE 전송 (첫 프레임은 10행 전부).
-          // displayGraphicData는 GRAPHIC_DISPLAY 리프레시 사이클(1~3행 3회 → 4~10행 3회 재구동)을
-          // 걸어 윗행이 들락거리므로 사용하지 않는다.
-          for(var r=0;r<ROWS;r++){
-            var diff=!prev;
-            if(prev)for(var c=r*COLS;c<(r+1)*COLS;c++){if(bytes[c]!==prev[c]){diff=true;break;}}
-            if(!diff)continue;
-            var rowHex=BLE.toHex(bytes.slice(r*COLS,(r+1)*COLS));
-            BLE.sdk.displayLineData(r+1,0,rowHex,BLE.DM.GraphicMode,BLE.dev);
+      if(!BLE.ready)return;
+      var ROWS=10,COLS=30;
+      BLE.devs.forEach(function(en){
+        if(!en.ready)return;
+        if(en.lastSent){var same=true;for(var i=0;i<300;i++){if(bytes[i]!==en.lastSent[i]){same=false;break;}}if(same)return;}
+        var prev=en.lastSent;en.lastSent=bytes;
+        try{
+          var rowsOk=en.dev&&en.dev.numberCellRows===ROWS&&en.dev.numberCellColumns===COLS;
+          if(!rowsOk||!BLE.DM){BLE.sdk.displayGraphicData(BLE.toHex(bytes),en.dev);}
+          else{
+            for(var r=0;r<ROWS;r++){
+              var diff=!prev;
+              if(prev)for(var c=r*COLS;c<(r+1)*COLS;c++){if(bytes[c]!==prev[c]){diff=true;break;}}
+              if(!diff)continue;
+              var rowHex=BLE.toHex(bytes.slice(r*COLS,(r+1)*COLS));
+              BLE.sdk.displayLineData(r+1,0,rowHex,BLE.DM.GraphicMode,en.dev);
+            }
           }
-        }
-      }catch(e){logErr('BLE 전송 오류: '+e.message);}
-      if(BLE.pendingBuf)setTimeout(BLE.pump,BLE.MIN_INTERVAL);
+        }catch(e){logErr('BLE 전송 오류: '+e.message);}
+      });
+      if(BLE.pendingBuf)setTimeout(BLE.pump,interval);
       return;
     }
-    // raw fallback: chunked GATT writes
+    // raw fallback: single device chunked GATT writes
+    if(BLE.rawLastSent){var rs=true;for(var j=0;j<300;j++){if(bytes[j]!==BLE.rawLastSent[j]){rs=false;break;}}if(rs)return;}
+    BLE.rawLastSent=bytes;
     BLE.busy=true;
     var size=(SD.cfg.write||'nores-20').indexOf('180')>=0?180:20;
     var chunks=[];
     for(var o=0;o<bytes.length;o+=size)chunks.push(bytes.slice(o,Math.min(o+size,bytes.length)));
     var useResp=(SD.cfg.write||'nores-20').indexOf('res-')===0;
     var p=Promise.resolve();
-    chunks.forEach(function(chunk){
-      p=p.then(function(){
-        return useResp?BLE.chr.writeValueWithResponse(chunk):BLE.chr.writeValueWithoutResponse(chunk);
-      });
-    });
-    p.then(function(){BLE.busy=false;BLE.pump();})
-     .catch(function(e){BLE.busy=false;logErr('BLE 전송 오류: '+e.message);});
+    chunks.forEach(function(chunk){p=p.then(function(){return useResp?BLE.chr.writeValueWithResponse(chunk):BLE.chr.writeValueWithoutResponse(chunk);});});
+    p.then(function(){BLE.busy=false;BLE.pump();}).catch(function(e){BLE.busy=false;logErr('BLE 전송 오류: '+e.message);});
   }
 };
 document.getElementById('bleBtn').addEventListener('click',function(){
-  BLE.connected?BLE.disconnect():BLE.connect();
+  BLE.connected?BLE.disconnect():BLE.addDevice();
 });
+(function(){var mb=document.getElementById('bleMultiBtn');if(mb)mb.addEventListener('click',function(){BLE.addDevice();});})();
 
 /* ═══════════ DEPLOY EDITION: SYNC TEST PATTERN ═══════════
    시뮬레이터와 실기기가 1:1로 같아야 하는 검증 패턴.
