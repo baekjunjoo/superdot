@@ -1522,6 +1522,161 @@ text_show:{
   dp.textLine(t);
   dp.onKey(function(k){if(k==='F1')dp.speak(t);});
   dp.speak(t);
+ }},
+weather:{
+ schema:'city:한글 도시명(선택, 기본 서울) — 현재 기온·날씨를 음성/점자. 온라인 필요. F1 새로고침 F2 자세히',
+ defaults:{city:'서울'},
+ run:function(dp,p){
+  var CITY={'서울':[37.5665,126.9780],'부산':[35.1796,129.0756],'인천':[37.4563,126.7052],'대구':[35.8714,128.6014],'대전':[36.3504,127.3845],'광주':[35.1595,126.8526],'강릉':[37.7519,128.8761],'제주':[33.4996,126.5312],'seoul':[37.5665,126.9780],'busan':[35.1796,129.0756]};
+  var cityName=p.city||'서울',cc=CITY[cityName]||CITY[String(cityName).toLowerCase()]||CITY['서울'];
+  dp.state.last=null;
+  function code(c){
+   if(c===0)return ['맑음','Clear','sun'];
+   if(c<=3)return ['구름','Cloudy','cloud'];
+   if(c===45||c===48)return ['안개','Fog','cloud'];
+   if(c>=51&&c<=67)return ['비','Rain','rain'];
+   if(c>=71&&c<=77)return ['눈','Snow','snow'];
+   if(c>=80&&c<=82)return ['소나기','Showers','rain'];
+   if(c>=95)return ['뇌우','Thunderstorm','rain'];
+   return ['흐림','Overcast','cloud'];
+  }
+  function icon(kind){dp.clear();
+   if(kind==='sun'){dp.circle(30,16,7,{fill:false});for(var a=0;a<8;a++){var ang=a*Math.PI/4;dp.line(30+Math.round(10*Math.cos(ang)),16+Math.round(10*Math.sin(ang)),30+Math.round(13*Math.cos(ang)),16+Math.round(13*Math.sin(ang)));}}
+   else if(kind==='cloud'){dp.circle(26,16,5,{fill:true});dp.circle(34,16,6,{fill:true});dp.rect(22,16,18,6,{fill:true});}
+   else if(kind==='rain'){dp.circle(26,12,5,{fill:true});dp.circle(34,12,6,{fill:true});dp.rect(22,12,18,5,{fill:true});for(var i=0;i<4;i++){var x=24+i*5;dp.line(x,22,x-2,28);}}
+   else if(kind==='snow'){dp.circle(26,12,5,{fill:true});dp.circle(34,12,6,{fill:true});dp.rect(22,12,18,5,{fill:true});for(var j=0;j<4;j++){var sx=24+j*5;dp.set(sx,24);dp.set(sx,27);dp.set(sx-1,25);dp.set(sx+1,25);}}
+  }
+  function show(){
+   var d=dp.state.last;if(!d){dp.textLine('weather...');return;}
+   var ci=code(d.code);icon(ci[2]);
+   dp.textLine(Math.round(d.temp)+'C '+ci[1]);
+   dp.speak(dp.L(cityName+' 현재 '+Math.round(d.temp)+'도, '+ci[0]+'.', cityName+' now '+Math.round(d.temp)+' degrees, '+ci[1]+'.'));
+  }
+  function load(){
+   dp.textLine('loading');
+   try{
+    fetch('https://api.open-meteo.com/v1/forecast?latitude='+cc[0]+'&longitude='+cc[1]+'&current=temperature_2m,weather_code,wind_speed_10m')
+    .then(function(r){return r.json();})
+    .then(function(j){var c=j.current||{};dp.state.last={temp:c.temperature_2m,code:c.weather_code,wind:c.wind_speed_10m};show();})
+    .catch(function(){dp.textLine('offline');dp.speak(dp.L('날씨 정보를 가져올 수 없습니다. 연결을 확인하세요.','Could not fetch weather. Check your connection.'));});
+   }catch(e){dp.speak(dp.L('날씨 정보를 가져올 수 없습니다.','Could not fetch weather.'));}
+  }
+  dp.onKey(function(k){
+   if(k==='F1'){dp.speak(dp.L('새로고침','Refreshing'));load();}
+   else if(k==='F2'){var d=dp.state.last;if(d)dp.speak(dp.L('기온 '+Math.round(d.temp)+'도, 바람 초속 '+Math.round(d.wind)+'.', 'Temperature '+Math.round(d.temp)+', wind '+Math.round(d.wind)+'.'));}
+  });
+  load();
+ }},
+coord_plane:{
+ schema:'points:[[x,y],...] 좌표(선택) — 좌표평면에 축·점 표시, 팬으로 점 탐색 F1 좌표읽기',
+ defaults:{points:[[2,3],[-3,1],[1,-2],[4,2]]},
+ run:function(dp,p){
+  var U=4,cx=30,cy=20;
+  var pts=(p.points||[]).filter(function(a){return a&&a.length>=2;}).slice(0,12);
+  if(!pts.length)pts=[[2,3],[-3,1]];
+  dp.state.i=-1;
+  function px(x){return cx+Math.round(x*U);}
+  function py(y){return cy-Math.round(y*U);}
+  function axes(){dp.clear();dp.line(2,cy,57,cy);dp.line(cx,2,cx,37);
+   for(var x=2;x<=57;x+=U)dp.set(x,cy-1);for(var y=2;y<=37;y+=U)dp.set(cx+1,y);}
+  function draw(){axes();
+   for(var k=0;k<pts.length;k++){var X=px(pts[k][0]),Y=py(pts[k][1]);
+    if(X>=2&&X<=57&&Y>=2&&Y<=37){dp.set(X,Y);dp.set(X-1,Y);dp.set(X+1,Y);dp.set(X,Y-1);dp.set(X,Y+1);
+     if(k===dp.state.i)dp.circle(X,Y,3,{fill:false});}}}
+  function read(){var pt=pts[dp.state.i];dp.textLine('('+pt[0]+','+pt[1]+')');dp.speak(dp.L('점 '+(dp.state.i+1)+', 엑스 '+pt[0]+', 와이 '+pt[1]+'.', 'Point '+(dp.state.i+1)+', x '+pt[0]+', y '+pt[1]+'.'));draw();}
+  draw();dp.textLine('coord plane');
+  dp.onKey(function(k){
+   if(k==='PAN_RIGHT'){dp.state.i=(dp.state.i+1)%pts.length;read();}
+   else if(k==='PAN_LEFT'){dp.state.i=(dp.state.i-1+pts.length)%pts.length;read();}
+   else if(k==='F1'){if(dp.state.i<0)dp.state.i=0;read();}
+   else if(k==='F2'){dp.state.i=0;read();}
+  });
+ }},
+graph_explore:{
+ schema:'fn:sin|cos|line|parab(기본 sin) — 함수 곡선 + 이동 커서, 팬으로 x 이동 F1 좌표읽기 F2 함수변경',
+ defaults:{fn:'sin'},
+ run:function(dp,p){
+  var FNS=['sin','cos','line','parab'],fi=FNS.indexOf(p.fn);if(fi<0)fi=0;
+  var U=4,cx=30,cy=20,xmin=-7,xmax=7;
+  dp.state.cur=0;
+  function f(x){var n=FNS[fi];if(n==='sin')return 3*Math.sin(x);if(n==='cos')return 3*Math.cos(x);if(n==='line')return 0.5*x;return 0.3*x*x-3;}
+  function px(x){return cx+Math.round(x*U);}
+  function py(y){return cy-Math.round(y*U);}
+  function clampY(Y){return Y<2?2:(Y>37?37:Y);}
+  function draw(){dp.clear();dp.line(2,cy,57,cy);dp.line(cx,2,cx,37);
+   var prev=null;
+   for(var xs=xmin;xs<=xmax;xs+=0.25){var X=px(xs),Y=clampY(py(f(xs)));if(prev)dp.line(prev[0],prev[1],X,Y);prev=[X,Y];}
+   var cX=px(dp.state.cur),cY=clampY(py(f(dp.state.cur)));dp.line(cX,2,cX,37);dp.circle(cX,cY,2,{fill:true});}
+  function read(){var x=dp.state.cur,y=Math.round(f(x)*10)/10;dp.textLine('x='+x+' y='+y);dp.speak(dp.L('엑스 '+x+', 와이 '+y+'.', 'x '+x+', y '+y+'.'));}
+  draw();dp.textLine('graph: '+FNS[fi]);
+  dp.onKey(function(k){
+   if(k==='PAN_RIGHT'){if(dp.state.cur<xmax)dp.state.cur++;draw();read();}
+   else if(k==='PAN_LEFT'){if(dp.state.cur>xmin)dp.state.cur--;draw();read();}
+   else if(k==='F1'){read();}
+   else if(k==='F2'){fi=(fi+1)%FNS.length;dp.state.cur=0;draw();dp.textLine('graph: '+FNS[fi]);dp.speak(dp.L('함수 '+FNS[fi],'Function '+FNS[fi]));}
+  });
+ }},
+map:{
+ schema:'(파라미터 없음) 간략 한국 지도 윤곽 + 도시 표식, 팬으로 도시 탐색 F1 위치읽기',
+ defaults:{},
+ run:function(dp,p){
+  var outline=[[30,3],[36,5],[40,9],[42,15],[44,20],[42,26],[44,31],[40,35],[33,37],[28,35],[24,31],[22,26],[20,21],[20,15],[23,9],[27,5],[30,3]];
+  var cities=[{ko:'서울',en:'Seoul',x:31,y:11},{ko:'강릉',en:'Gangneung',x:40,y:12},{ko:'대전',en:'Daejeon',x:31,y:20},{ko:'대구',en:'Daegu',x:37,y:23},{ko:'광주',en:'Gwangju',x:27,y:29},{ko:'부산',en:'Busan',x:39,y:30},{ko:'제주',en:'Jeju',x:30,y:38}];
+  dp.state.i=-1;
+  function draw(){dp.clear();
+   for(var k=1;k<outline.length;k++)dp.line(outline[k-1][0],outline[k-1][1],outline[k][0],outline[k][1]);
+   for(var c=0;c<cities.length;c++){var ct=cities[c];dp.set(ct.x,ct.y);if(c===dp.state.i)dp.circle(ct.x,ct.y,3,{fill:false});}}
+  function read(){var ct=cities[dp.state.i];dp.textLine((dp.state.i+1)+'/'+cities.length+' '+ct.en);dp.speak(dp.L(ct.ko+'.', ct.en+'.'));draw();}
+  draw();dp.textLine('korea map');
+  dp.onKey(function(k){
+   if(k==='PAN_RIGHT'){dp.state.i=(dp.state.i+1)%cities.length;read();}
+   else if(k==='PAN_LEFT'){dp.state.i=(dp.state.i-1+cities.length)%cities.length;read();}
+   else if(k==='F1'){if(dp.state.i<0)dp.state.i=0;read();}
+   else if(k==='F2'){dp.state.i=0;read();}
+  });
+ }},
+xlate:{
+ schema:'to:대상언어 en|ko|ja(기본 반대언어) — 음성을 실시간 번역해 점자/음성. 온라인 필요. F1 지우기 F2 일시정지',
+ defaults:{},
+ run:function(dp,p){
+  var to=p.to||(LANG==='en'?'ko':'en');
+  var langName={en:'영어',ko:'한국어',ja:'일본어'}[to]||to;
+  dp.state.txt='';dp.state.on=true;dp.state.warned=false;
+  function render(){drawBrailleBlock(dp,dp.state.txt);}
+  dp.textLine('translate '+to);render();
+  function translate(src){
+   try{
+    fetch(SD.api(),{method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,system:'You are a translator. Translate the user text to '+langName+'. Output only the translation, no notes.',messages:[{role:'user',content:src}]})})
+    .then(function(r){return r.json();})
+    .then(function(j){if(j.error)throw new Error(j.error.message||'api');var out=(j.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join(' ').trim();if(!out)return;dp.state.txt+=out+' ';render();dp.speak(out);})
+    .catch(function(){if(!dp.state.warned){dp.state.warned=true;dp.speak(dp.L('번역 서버에 연결할 수 없습니다. 설정에서 프록시 API를 확인하세요.','Cannot reach translation server. Check the proxy API in setup.'));}});
+   }catch(e){}
+  }
+  dp.listen(function(t,fin){if(!dp.state.on)return;if(fin){var s=String(t).trim();if(s)translate(s);}});
+  dp.onKey(function(k){
+   if(k==='F1'){dp.state.txt='';render();dp.speak(dp.L('지웠습니다','Cleared'));}
+   else if(k==='F2'){dp.state.on=!dp.state.on;dp.textLine(dp.state.on?'translate '+to:'paused');dp.speak(dp.state.on?dp.L('재개','Resumed'):dp.L('일시정지','Paused'));}
+  });
+ }},
+doc:{
+ schema:'text:긴 본문(필수) — 점자 페이지 단위 뷰어, 팬으로 페이지 넘김 F1 읽기 F2 처음',
+ defaults:{text:'점자 문서 뷰어입니다. 본문을 입력하면 페이지 단위로 점자로 표시하고, 팬 키로 페이지를 넘기며 F1으로 읽어줍니다.'},
+ run:function(dp,p){
+  var text=String(p.text||'').trim()||'문서가 비어 있습니다.';
+  var words=text.split(/\s+/),pages=[],cur='';
+  for(var w=0;w<words.length;w++){var cand=cur?cur+' '+words[w]:words[w];if(cand.length>72){pages.push(cur);cur=words[w];}else cur=cand;}
+  if(cur)pages.push(cur);
+  if(!pages.length)pages=[text];
+  dp.state.p=0;
+  function show(){drawBrailleBlock(dp,pages[dp.state.p]);dp.textLine('page '+(dp.state.p+1)+'/'+pages.length);}
+  show();dp.speak(dp.L(pages.length+'페이지 문서입니다. 팬 키로 넘기고 F1으로 읽습니다.', pages.length+' page document. Pan to turn pages, F1 to read.'));
+  dp.onKey(function(k){
+   if(k==='PAN_RIGHT'){if(dp.state.p<pages.length-1){dp.state.p++;show();dp.speak(dp.L('다음 페이지','Next page'));}else dp.speak(dp.L('마지막 페이지','Last page'));}
+   else if(k==='PAN_LEFT'){if(dp.state.p>0){dp.state.p--;show();dp.speak(dp.L('이전 페이지','Previous page'));}else dp.speak(dp.L('첫 페이지','First page'));}
+   else if(k==='F1'){dp.speak(pages[dp.state.p]);}
+   else if(k==='F2'){dp.state.p=0;show();dp.speak(dp.L('처음으로','Back to start'));}
+  });
  }}
 };
 
@@ -1548,6 +1703,12 @@ var KEYMAP={
  timer:{F1:['시작/정지','start'],F2:['리셋','reset'],F3:['남은시간','time']},
  caption:{F1:['지우기','clear'],F2:['일시정지','pause']},
  minutes:{F1:['저장','save'],F2:['일시정지','pause'],F3:['라이브','live'],F4:['지우기','clear'],PL:['이전','prev'],PR:['다음','next']},
+ weather:{F1:['새로고침','refresh'],F2:['자세히','details']},
+ coord_plane:{F1:['좌표읽기','read'],F2:['처음','first'],PL:['이전','prev'],PR:['다음','next']},
+ graph_explore:{F1:['좌표읽기','read'],F2:['함수변경','func'],PL:['왼쪽','left'],PR:['오른쪽','right']},
+ map:{F1:['위치읽기','read'],F2:['처음','first'],PL:['이전','prev'],PR:['다음','next']},
+ xlate:{F1:['지우기','clear'],F2:['일시정지','pause']},
+ doc:{F1:['읽기','read'],F2:['처음','first'],PL:['이전 페이지','prev'],PR:['다음 페이지','next']},
  list_nav:{F1:['반복','repeat'],F2:['처음','first'],PL:['이전','prev'],PR:['다음','next']},
  quiz:{F1:['1번','opt1'],F2:['2번','opt2'],F3:['3번','opt3']},
  text_show:{F1:['읽기','read']},
@@ -1653,7 +1814,13 @@ var MATCH_RULES=[
  {t:'plot',kw:[['사인',5],['코사인',5],['싸인',5],['파형',4],['곡선',3],['함수',2],['sine',6],['cosine',5],['sin wave',5],['waveform',4],['curve',3],['function',2],['graph',2]]},
  {t:'bar_chart',kw:[['막대',4],['차트',3],['매출',2],['통계',2],['그래프',2],['비교',1],['bar chart',5],['bar graph',5],['barchart',5],['sales',2],['statistics',2],['chart',2]]},
  {t:'list_nav',kw:[['메뉴',4],['목록',4],['리스트',4],['시간표',5],['알림장',5],['숙제',4],['명단',4],['단계',2],['순서',2],['차례',2],['menu',4],['list',3],['timetable',5],['schedule',5],['roster',4],['homework',4],['steps',2]]},
- {t:'text_show',kw:[['점자로',4],['점자 출력',4],['써줘',2],['보여줘',1],['표시해',1],['in braille',4],['show braille',4],['display text',3]]}
+ {t:'text_show',kw:[['점자로',4],['점자 출력',4],['써줘',2],['보여줘',1],['표시해',1],['in braille',4],['show braille',4],['display text',3]]},
+ {t:'weather',kw:[['날씨',6],['기온',5],['몇 도',4],['weather',6],['temperature',5],['forecast',5]]},
+ {t:'coord_plane',kw:[['좌표평면',7],['좌표 평면',7],['좌표계',6],['coordinate plane',7],['xy 좌표',5],['좌표 찍',5]]},
+ {t:'graph_explore',kw:[['그래프 탐색',11],['그래프탐색',11],['함수 탐색',10],['그래프 따라',10],['곡선 탐색',10],['explore graph',11],['graph explore',11],['trace graph',10]]},
+ {t:'map',kw:[['촉각지도',8],['촉각 지도',8],['지도 탐색',7],['한국 지도',7],['지도',5],['tactile map',8],['map',4]]},
+ {t:'xlate',kw:[['실시간 번역',8],['번역 자막',8],['번역자막',8],['통역',6],['번역',5],['외국어 자막',7],['real-time translation',8],['translate caption',8],['translation',6],['interpret',5]]},
+ {t:'doc',kw:[['문서 뷰어',8],['문서뷰어',8],['점자 뷰어',8],['문서 보기',6],['문서 읽',6],['본문 읽',5],['긴 글',5],['document viewer',8],['braille viewer',8],['read document',6]]}
 ];
 function extractItems(req){            // "메뉴: 김치찌개, 된장찌개" / "a, b, c 목록" / "시간표 국어 수학 영어"
   var part=req,m=req.match(/[:：](.+)$/);
@@ -1761,6 +1928,26 @@ function localMatch(req){
   else if(t==='text_show'){
     var q=req.match(/["'“”‘'](.+?)["'“”‘']/);
     if(q)params.text=q[1];else needAI=true;
+  }
+  else if(t==='weather'){
+    var CITYK=['서울','부산','인천','대구','대전','광주','강릉','제주'];
+    for(var wi=0;wi<CITYK.length;wi++)if(req.indexOf(CITYK[wi])>=0){params.city=CITYK[wi];break;}
+  }
+  else if(t==='coord_plane'){
+    var cpp=[],cpm,cpre=/\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)/g;
+    while((cpm=cpre.exec(req))&&cpp.length<12)cpp.push([+cpm[1],+cpm[2]]);
+    if(cpp.length)params.points=cpp;
+  }
+  else if(t==='graph_explore'){
+    params.fn=/코사인|cosine|cos/i.test(low)?'cos':(/직선|일차|linear|line/i.test(low)?'line':(/포물|이차|parab|quadratic/i.test(low)?'parab':'sin'));
+  }
+  else if(t==='xlate'){
+    params.to=/영어|english|영문/i.test(low)?'en':(/일본|japanese|일어/i.test(low)?'ja':(/한국어|korean|한글/i.test(low)?'ko':(LANG==='en'?'ko':'en')));
+  }
+  else if(t==='doc'){
+    var dq=req.match(/["'“”‘'](.+?)["'“”‘']/);
+    if(dq&&dq[1].length>=10)params.text=dq[1];
+    else{var dc=req.match(/[:：]\s*([\s\S]+)$/);if(dc&&dc[1].trim().length>=10)params.text=dc[1].trim();}
   }
   return {template:t,params:params,score:best.score,needAI:needAI};
 }
