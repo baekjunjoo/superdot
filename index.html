@@ -1071,10 +1071,11 @@ var featureNameEl=document.getElementById('featureName'),codeBox=document.getEle
 /* ═══════════ SPEC ENGINE: 선언적 템플릿 — 코드 생성 없이 조합으로 기능 구성 ═══════════ */
 
 function drawBrailleBlock(dp,str,opts){          // 그래픽 영역 멀티라인 점자
-  opts=opts||{};var per=opts.per||20,lines=opts.lines||8,gy=opts.gapY||5;
+  opts=opts||{};var per=opts.per||20,lines=opts.lines||8,gy=opts.gapY||5,paged=opts.page;
   function paint(cells){
     var max=per*lines,off=0;
-    if(cells.length>max)off=Math.ceil((cells.length-max)/per)*per;
+    if(paged)off=cells.length?Math.floor((cells.length-1)/max)*max:0;    // 페이지 방식: 가득 차면 다음 페이지를 맨 위부터(줄 스크롤 대신 → 줄 넘김마다 전체 리프레시 방지)
+    else if(cells.length>max)off=Math.ceil((cells.length-max)/per)*per;  // 기존 줄 단위 스크롤
     dp.clear();
     for(var i=off;i<cells.length;i++){
       var n=i-off,x=(n%per)*3,y=Math.floor(n/per)*gy,dots=cells[i];
@@ -1390,7 +1391,7 @@ caption:{
  defaults:{},
  run:function(dp,p){
   dp.state.txt='';dp.state.tmp='';dp.state.on=true;dp.state._rt=0;dp.state._last='';
-  function render(){var s=dp.state.txt+dp.state.tmp;if(s===dp.state._last)return;dp.state._last=s;drawBrailleBlock(dp,s);}
+  function render(){var s=dp.state.txt+dp.state.tmp;if(s===dp.state._last)return;dp.state._last=s;drawBrailleBlock(dp,s,{page:true});}
   function requestRender(){
    if(dp.state._rt)return;
    dp.state._rt=dp.timeout(220,function(){dp.state._rt=0;render();});   // 디바운스 상향: interim 결과로 같은 줄 재전송 빈도 감소
@@ -1415,7 +1416,7 @@ minutes:{
   function render(){
    if(dp.state.review>=0){var rl=dp.state.lines[dp.state.review];if(rl)drawBrailleBlock(dp,rl.s);return;}
    var s=dp.state.lines.map(function(l){return l.s;}).join(' ')+(dp.state.tmp?(' '+dp.state.tmp):'');
-   if(s===dp.state._last)return;dp.state._last=s;drawBrailleBlock(dp,s);
+   if(s===dp.state._last)return;dp.state._last=s;drawBrailleBlock(dp,s,{page:true});
   }
   function requestRender(){if(dp.state._rt)return;dp.state._rt=dp.timeout(220,function(){dp.state._rt=0;render();});}
   function save(){
