@@ -912,13 +912,23 @@ function createDP(){
     },
     speak:function(text){if(!dead)tts(String(text));},
     L:function(ko,en){return (LANG==='en'&&en!=null)?en:ko;},
-    listen:function(fn){
+    listen:function(fn,opts){
       if(dead)return false;
       var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
       if(!SR){tts(LANG==='en'?'Speech recognition is not supported in this browser. Please use Chrome.':'이 브라우저는 음성 인식을 지원하지 않습니다. 크롬에서 열어주세요.');return false;}
       if(window.stopDictation)stopDictation();   // MIC 받아쓰기와 동시 실행 불가 — 충돌 방지
       dp.stopListen();
-      recog=new SR();recog.lang=(LANG==='en'?'en-US':'ko-KR');recog.continuous=true;recog.interimResults=true;
+      dp._listenFn=fn;
+      if(opts&&opts.lang)dp._listenLang=opts.lang;
+      if(!dp._listenLang)dp._listenLang=(LANG==='en'?'en':'ko');
+      return dp._startRecog();
+    },
+    _startRecog:function(){                                 // 현재 dp._listenLang으로 연속 인식 (재)시작
+      if(dead||!dp._listenFn)return false;
+      var SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return false;
+      recog=new SR();
+      recog.lang=(dp._listenLang==='en'?'en-US':(dp._listenLang==='ja'?'ja-JP':'ko-KR'));
+      recog.continuous=true;recog.interimResults=true;
       recog.onstart=function(){if(!dead)micActive(true);};
       recog.onresult=function(e){
         if(dead)return;
@@ -928,8 +938,8 @@ function createDP(){
           if(r.isFinal)fin+=r[0].transcript;else tmp+=r[0].transcript;
         }
         try{
-          if(fin)fn(fin,true);
-          fn(tmp,false);
+          if(fin)dp._listenFn(fin,true);
+          dp._listenFn(tmp,false);
         }catch(err){logErr('listen 콜백 오류: '+err.message);}
       };
       recog.onerror=function(e){
@@ -938,8 +948,14 @@ function createDP(){
       recog.onend=function(){
         if(!dead&&recog){try{recog.start();}catch(e){}}   // 연속 모드 자동 재시작
       };
-      try{recog.start();logRow('<span class="key">[MIC] 연속 음성 인식 시작</span>');}catch(e){logErr('음성 인식 시작 실패: '+e.message);return false;}
+      try{recog.start();logRow('<span class="key">[MIC] 연속 음성 인식 시작 ('+recog.lang+')</span>');}catch(e){logErr('음성 인식 시작 실패: '+e.message);return false;}
       return true;
+    },
+    setListenLang:function(code){                           // 인식 언어 전환(ko|en|ja) — 같은 콜백 유지하며 재시작
+      dp._listenLang=code;
+      if(recog){var r=recog;recog=null;try{r.onend=null;r.stop();}catch(e){}}
+      micActive(false);
+      return dp._startRecog();
     },
     stopListen:function(){
       if(recog){var r=recog;recog=null;try{r.onend=null;r.stop();}catch(e){}}
@@ -1359,6 +1375,7 @@ caption:{
   dp.onKey(function(k){
    if(k==='F1'){dp.state.txt='';dp.state.tmp='';render();dp.speak(dp.L('자막을 지웠습니다', 'Caption cleared.'));}
    else if(k==='F2'){dp.state.on=!dp.state.on;dp.textLine(dp.state.on?'live caption':'paused');dp.speak(dp.state.on?dp.L('자막 재개','Caption resumed'):dp.L('자막 일시정지','Caption paused'));}
+   else if(k==='F3'){var nl=(dp._listenLang==='en')?'ko':'en';dp.setListenLang(nl);dp.textLine(nl==='en'?'caption EN':'caption KO');dp.speak(nl==='en'?'English recognition':'한국어 인식');}
   });
  }},
 minutes:{
@@ -1399,14 +1416,18 @@ minutes:{
    var L=dp.state.lines;
    if(k==='F1'){save();}
    else if(k==='F2'){dp.state.on=!dp.state.on;dp.textLine(dp.state.on?'minutes rec':'paused');dp.speak(dp.state.on?dp.L('기록을 재개합니다.','Recording resumed.'):dp.L('일시정지했습니다.','Paused.'));}
-   else if(k==='F3'){dp.state.review=-1;dp.state._last='';render();dp.textLine('minutes live');dp.speak(dp.L('실시간 모드입니다. 지금까지 '+L.length+'문장 기록했습니다.','Live mode. '+L.length+' lines recorded.'));}
+   else if(k==='F3'){var nl=(dp._listenLang==='en')?'ko':'en';dp.setListenLang(nl);dp.textLine(nl==='en'?'minutes EN':'minutes KO');dp.speak(nl==='en'?'English recognition':'한국어 인식');}
    else if(k==='F4'){dp.state.lines=[];dp.state.tmp='';dp.state.review=-1;dp.state._last='';render();dp.textLine('cleared');dp.speak(dp.L('회의록을 모두 지웠습니다.','Minutes cleared.'));}
    else if(k==='PAN_LEFT'||k==='PAN_RIGHT'){
     if(!L.length){dp.speak(dp.L('아직 기록된 내용이 없습니다.','Nothing recorded yet.'));return;}
-    if(dp.state.review<0)dp.state.review=L.length-1;
-    else dp.state.review+=(k==='PAN_RIGHT'?1:-1);
-    if(dp.state.review<0)dp.state.review=0;
-    if(dp.state.review>L.length-1)dp.state.review=L.length-1;
+    if(dp.state.review<0){
+     if(k==='PAN_LEFT')dp.state.review=L.length-1;
+     else{dp.speak(dp.L('실시간 모드입니다.','Live mode.'));return;}
+    }else{
+     dp.state.review+=(k==='PAN_RIGHT'?1:-1);
+     if(dp.state.review<0)dp.state.review=0;
+     if(dp.state.review>L.length-1){dp.state.review=-1;dp.state._last='';render();dp.textLine('minutes live');dp.speak(dp.L('실시간 모드입니다. 지금까지 '+L.length+'문장.','Live mode. '+L.length+' lines so far.'));return;}
+    }
     var rl=L[dp.state.review];drawBrailleBlock(dp,rl.s);
     dp.textLine((dp.state.review+1)+'/'+L.length+' '+rl.t);
     dp.speak(dp.L((dp.state.review+1)+'번째 문장. '+rl.s, 'Line '+(dp.state.review+1)+'. '+rl.s));
@@ -1701,8 +1722,8 @@ var KEYMAP={
  rps:{F1:['가위','sciss'],F2:['바위','rock'],F3:['보','paper']},
  maze:{F1:['위','up'],F4:['아래','down'],PL:['왼쪽','left'],PR:['오른쪽','right']},
  timer:{F1:['시작/정지','start'],F2:['리셋','reset'],F3:['남은시간','time']},
- caption:{F1:['지우기','clear'],F2:['일시정지','pause']},
- minutes:{F1:['저장','save'],F2:['일시정지','pause'],F3:['라이브','live'],F4:['지우기','clear'],PL:['이전','prev'],PR:['다음','next']},
+ caption:{F1:['지우기','clear'],F2:['일시정지','pause'],F3:['언어 전환','lang']},
+ minutes:{F1:['저장','save'],F2:['일시정지','pause'],F3:['언어 전환','lang'],F4:['지우기','clear'],PL:['이전','prev'],PR:['다음','next']},
  weather:{F1:['새로고침','refresh'],F2:['자세히','details']},
  coord_plane:{F1:['좌표읽기','read'],F2:['처음','first'],PL:['이전','prev'],PR:['다음','next']},
  graph_explore:{F1:['좌표읽기','read'],F2:['함수변경','func'],PL:['왼쪽','left'],PR:['오른쪽','right']},
@@ -2168,10 +2189,10 @@ var SINE=specFeature({template:'plot',params:{fn:'sin'}},
   tts_intro:{ko:'사인 곡선 그래프입니다. F1 키를 누르면 주기가 바뀝니다.',en:'Sine wave graph. Press F1 to change the number of cycles.'}});
 var LIVE=specFeature({template:'caption',params:{}},
  {id:7,name:'DEMO: 라이브 점자 자막',description:'마이크로 말하면 그래픽 영역에 멀티라인 점자 자막이 실시간 표시. F1 지우기, F2 일시정지/재개.',request:'(내장 데모)',
-  tts_intro:{ko:'라이브 점자 자막입니다. 지금부터 말하면 그래픽 영역에 점자로 실시간 표시됩니다. 화면이 차면 자동으로 넘어갑니다. F1은 지우기, F2는 일시정지와 재개입니다.',en:'Live braille caption. Speak now and it appears in braille in real time. The display scrolls when full. F1 clears, F2 pauses and resumes.'}});
+  tts_intro:{ko:'라이브 점자 자막입니다. 지금부터 말하면 그래픽 영역에 점자로 실시간 표시됩니다. 화면이 차면 자동으로 넘어갑니다. F1은 지우기, F2는 일시정지와 재개, F3은 한국어와 영어 인식 전환입니다. 영어로 말할 때는 F3을 눌러 영어로 바꾸세요.',en:'Live braille caption. Speak now and it appears in braille in real time. The display scrolls when full. F1 clears, F2 pauses and resumes, F3 switches recognition between Korean and English.'}});
 var MINUTES=specFeature({template:'minutes',params:{}},
  {id:8,name:'DEMO: 회의록',description:'마이크로 말하면 문장 단위로 타임스탬프와 함께 누적 기록. 점자 실시간 표시 + 팬 키로 이전 문장 검토, F1으로 .txt 파일 저장. F1 저장, F2 일시정지, F3 라이브, F4 지우기.',request:'(내장 데모)',
-  tts_intro:{ko:'회의록입니다. 말하면 문장이 시간과 함께 차곡차곡 기록됩니다. 팬 키로 이전 문장을 다시 들을 수 있고, F1을 누르면 전체 내용을 텍스트 파일로 저장합니다. F2는 일시정지, F3는 실시간으로 돌아가기, F4는 모두 지우기입니다.',en:'Meeting minutes. As you speak, each sentence is logged with a timestamp. Use the pan keys to review earlier lines, and press F1 to save everything as a text file. F2 pauses, F3 returns to live, F4 clears.'}});
+  tts_intro:{ko:'회의록입니다. 말하면 문장이 시간과 함께 차곡차곡 기록됩니다. 팬 키로 이전 문장을 다시 듣고, 끝까지 넘기면 실시간으로 돌아옵니다. F1은 파일 저장, F2는 일시정지, F3은 한국어와 영어 인식 전환, F4는 모두 지우기입니다. 영어로 말할 때는 F3으로 영어로 바꾸면 영어가 그대로 기록됩니다.',en:'Meeting minutes. As you speak, each sentence is logged with a timestamp. Use the pan keys to review earlier lines; pan past the end to return to live. F1 saves to a file, F2 pauses, F3 switches recognition between Korean and English, F4 clears.'}});
 library.push(DEMO);library.push(DICE);library.push(CLOCK);library.push(RPS);library.push(MAZE);library.push(SINE);library.push(LIVE);library.push(MINUTES);
 loadFeature(DEMO,false);renderLibrary();
 (function bootStatus(){   // #6 초기 세팅 상태: 자유 입력(AI) 가능 여부를 부팅 시 1회 안내
