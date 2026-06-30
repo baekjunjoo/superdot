@@ -1020,15 +1020,43 @@ function refreshVoices(){
   }catch(e){}
 }
 try{refreshVoices();speechSynthesis.addEventListener('voiceschanged',refreshVoices);}catch(e){}
+/* ── 문장 언어 자동 감지 → 언어별 음성 선택 (한국어/영어 혼용 발화 대응) ── */
+function detectTextLang(text){
+  var s=String(text||'');
+  if(/[가-힣ᄀ-ᇿ㄰-㆏]/.test(s))return 'ko';   // 한글
+  if(/[぀-ヿ]/.test(s))return 'ja';                            // 가나
+  if(/[A-Za-z]/.test(s))return 'en';                                   // 라틴 문자
+  return (LANG==='en'?'en':'ko');                                      // 숫자/기호만 → UI 언어
+}
+function voicesForLang(code){
+  var all=[];try{all=speechSynthesis.getVoices()||[];}catch(e){}
+  return all.filter(function(v){var l=(v.lang||'').toLowerCase(),n=(v.name||'').toLowerCase();
+    if(code==='en')return /^en/.test(l)||/english/.test(n);
+    if(code==='ja')return /^ja/.test(l)||/japanese|日本/.test(n);
+    return /^ko/.test(l)||/korean|한국/.test(n);});
+}
+function pickVoiceFor(code){
+  TTSV.byLang=TTSV.byLang||{};
+  var list=voicesForLang(code);
+  var want=window.SD&&SD.cfg&&SD.cfg.voice;                            // SETUP에서 고른 음성은 해당 언어에 한해 우선
+  if(want)for(var i=0;i<list.length;i++)if(list[i].name===want)return (TTSV.byLang[code]=list[i]);
+  var cached=TTSV.byLang[code];                                        // 같은 언어 내 도중 교체 방지
+  if(cached)for(var j=0;j<list.length;j++)if(list[j].name===cached.name)return cached;
+  var best=null;
+  for(var k=0;k<list.length;k++)if(!best||ttsScore(list[k])>ttsScore(best))best=list[k];
+  TTSV.byLang[code]=best;return best;                                  // 없으면 null → 브라우저 기본 음성
+}
 function tts(text){
   logRow('<span class="spk">'+escapeHtml(text)+'</span>');
   if(window.SD&&SD.cfg.mute)return;
   try{
     speechSynthesis.cancel();
     var u=new SpeechSynthesisUtterance(text);
-    u.lang=(LANG==='en'?'en-US':'ko-KR');u.rate=((window.SD&&SD.cfg.rate)||105)/100;u.pitch=1;u.volume=ttsVol();
-    if(!TTSV.pick||TTSV.lockLang!==LANG)refreshVoices();
-    if(TTSV.pick){u.voice=TTSV.pick;TTSV.locked=true;TTSV.lockLang=LANG;}
+    var code=detectTextLang(text);
+    u.lang=(code==='en'?'en-US':(code==='ja'?'ja-JP':'ko-KR'));
+    u.rate=((window.SD&&SD.cfg.rate)||105)/100;u.pitch=1;u.volume=ttsVol();
+    var v=pickVoiceFor(code);
+    if(v)u.voice=v;
     speechSynthesis.speak(u);
   }catch(e){}
 }
@@ -2283,7 +2311,7 @@ function applyLang(){
   try{if(typeof applyKeymap==='function'&&window.currentFeature)applyKeymap(currentFeature.spec?currentFeature.spec.template:null);}catch(e){}
   // TTS 버튼 상태 텍스트가 켜짐/꺼짐을 반영 중이면 현재 상태 유지하며 언어만 교체
 }
-function setLang(l){LANG=l;try{localStorage.setItem('sd_lang',l);}catch(e){}TTSV.locked=false;if(typeof refreshVoices==='function')refreshVoices();applyLang();}
+function setLang(l){LANG=l;try{localStorage.setItem('sd_lang',l);}catch(e){}TTSV.locked=false;TTSV.byLang={};if(typeof refreshVoices==='function')refreshVoices();applyLang();}
 function initLang(){
   applyLang();
   var lb=document.getElementById('langBtn');
@@ -2322,9 +2350,9 @@ var SD={
     }
   }
   document.getElementById('voiceTest').addEventListener('click',function(){
-    var prev=SD.cfg.voice;SD.cfg.voice=fVoice.value;TTSV.locked=false;refreshVoices();
+    var prev=SD.cfg.voice;SD.cfg.voice=fVoice.value;TTSV.locked=false;TTSV.byLang={};refreshVoices();
     tts('안녕하세요. 닷패드 음성 안내 테스트입니다.');
-    SD.cfg.voice=prev;TTSV.locked=false;refreshVoices();
+    SD.cfg.voice=prev;TTSV.locked=false;TTSV.byLang={};refreshVoices();
   });
   function llStatText(){
     if(LL.status==='ready')return 'Liblouis: 사용 중 (v'+LL.ver+') · 실패 단어는 내장 변환기로 자동 폴백';
@@ -2364,7 +2392,7 @@ var SD={
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&bg.classList.contains('open'))close();});
   document.getElementById('cfgSave').addEventListener('click',function(){
     SD.cfg.api=fApi.value.trim();SD.cfg.svc=fSvc.value.trim().toLowerCase();SD.cfg.chr=fChr.value.trim().toLowerCase();
-    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.cfg.engine=fEng.value;SD.cfg.voice=fVoice.value;SD.cfg.vol=parseInt(fVol.value,10);SD.cfg.volMic=parseInt(fVolMic.value,10);SD.cfg.rate=parseInt(fRate.value,10);refreshVoices();SD.save();close();
+    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.cfg.engine=fEng.value;SD.cfg.voice=fVoice.value;SD.cfg.vol=parseInt(fVol.value,10);SD.cfg.volMic=parseInt(fVolMic.value,10);SD.cfg.rate=parseInt(fRate.value,10);TTSV.byLang={};refreshVoices();SD.save();close();
     if(SD.cfg.engine==='liblouis'&&LL.status!=='ready'){
       LL.load(function(ok3){updateLL();logRow('<span class="key">[SETUP] '+escapeHtml(llStatText())+'</span>');if(ok3&&currentFeature)loadFeature(currentFeature,false);});
     }
