@@ -1740,6 +1740,7 @@ function specFeature(spec,meta){
   meta=meta||{};
   return {id:meta.id||Date.now(),name:meta.name||('SPEC: '+spec.template),
     description:meta.description||(TEMPLATES[spec.template]?TEMPLATES[spec.template].schema:''),
+    nameEn:meta.nameEn||null,descEn:meta.descEn||null,
     tts_intro:meta.tts_intro||'',request:meta.request||'(스펙)',spec:spec};
 }
 
@@ -1786,7 +1787,7 @@ function loadFeature(feature,speakIntro){
   try{speechSynthesis.cancel();}catch(e){}
   frameBuf.fill(0);textBuf.fill(0);requestPaint();
   currentDP=createDP();currentFeature=feature;
-  featureNameEl.textContent=feature.name||'\u2014';
+  featureNameEl.textContent=fName(feature)||'\u2014';
   applyKeymap(feature.spec?feature.spec.template:null);   // #14 키맵 표시
   codeView.textContent=feature.spec?JSON.stringify(feature.spec,null,1):feature.code;codeBox.hidden=false;
   try{
@@ -2058,7 +2059,7 @@ function generate(){
   function finish(feature,tierMsg){
     contextFeature=feature;
     library=library.filter(function(f){return f.id!==feature.id;});library.unshift(feature);renderLibrary();
-    addMsg('ai','<span class="ftitle">\u2713 '+escapeHtml(feature.name)+'</span><div class="small">'+escapeHtml(feature.description||'')+'</div><div class="small">'+tierMsg+'</div>');
+    addMsg('ai','<span class="ftitle">\u2713 '+escapeHtml(fName(feature))+'</span><div class="small">'+escapeHtml(fDesc(feature))+'</div><div class="small">'+tierMsg+'</div>');
   }
 
   /* ── T1: 라이브러리 재사용 (0 토큰) ── */
@@ -2166,13 +2167,15 @@ newBtn.addEventListener('click',function(){contextFeature=null;addMsg('ai',t('dy
 
 /* LIBRARY */
 var library=[],libraryEl=document.getElementById('library');
+function fName(f){return (LANG==='en'&&f&&f.nameEn)?f.nameEn:(f&&f.name)||'';}
+function fDesc(f){return (LANG==='en'&&f&&f.descEn)?f.descEn:((f&&f.description)||'');}
 function renderLibrary(){
   if(!library.length){libraryEl.innerHTML='<div class="empty">'+t('dyn.libempty')+'</div>';return;}
   libraryEl.innerHTML='';
   library.forEach(function(f){
     var item=document.createElement('div');
     item.className='libItem'+(currentFeature&&currentFeature.id===f.id?' active':'');
-    item.innerHTML='<div class="grow"><div class="name">'+escapeHtml(f.name)+'</div><div class="desc">'+escapeHtml(f.description||'')+'</div></div>';
+    item.innerHTML='<div class="grow"><div class="name">'+escapeHtml(fName(f))+'</div><div class="desc">'+escapeHtml(fDesc(f))+'</div></div>';
     var loadB=document.createElement('button');loadB.className='btn';loadB.textContent='RUN';loadB.onclick=function(){loadFeature(f);contextFeature=f;};
     var delB=document.createElement('button');delB.className='btn';delB.textContent='\u2715';delB.title='삭제';delB.onclick=function(){library=library.filter(function(x){return x.id!==f.id;});renderLibrary();};
     item.appendChild(loadB);item.appendChild(delB);libraryEl.appendChild(item);
@@ -2200,28 +2203,28 @@ document.getElementById('exportBtn').addEventListener('click',function(){
 
 /* DEMO */
 var DEMO=specFeature({template:'bar_chart',params:{title:'sales q1-q4',data:[32,45,28,51],labels:['q1','q2','q3','q4'],unit:'억 원'}},
- {id:0,name:'DEMO: 분기 매출 차트',description:'4개 분기 막대그래프. F1/팬 키 탐색, 텍스트 라인+음성 안내.',request:'(내장 데모)',
+ {id:0,name:'DEMO: 분기 매출 차트',description:'4개 분기 막대그래프. F1/팬 키 탐색, 텍스트 라인+음성 안내.',nameEn:'DEMO: Quarterly sales chart',descEn:'Four-quarter bar graph. F1/pan to explore, text line + voice.',request:'(내장 데모)',
   tts_intro:{ko:'분기별 매출 차트입니다. F1 키나 팬 키로 분기를 이동하면 값을 읽어주고 텍스트 라인에 표시합니다.',en:'Quarterly sales chart. Use F1 or the pan keys to move between quarters; values are spoken and shown on the text line.'}});
 var DICE=specFeature({template:'dice',params:{}},
- {id:2,name:'DEMO: 주사위',description:'F1로 주사위 굴리기. 결과는 텍스트 라인+음성.',request:'(내장 데모)',
+ {id:2,name:'DEMO: 주사위',description:'F1로 주사위 굴리기. 결과는 텍스트 라인+음성.',nameEn:'DEMO: Dice',descEn:'Press F1 to roll. Result on text line + voice.',request:'(내장 데모)',
   tts_intro:{ko:'주사위 기능입니다. F1 키를 누르면 주사위를 굴리고 결과를 읽어줍니다.',en:'Dice. Press F1 to roll and hear the result.'}});
 var CLOCK=specFeature({template:'clock',params:{}},
- {id:3,name:'DEMO: 촉각 시계',description:'아날로그 시계(그래픽) + 디지털 시각(텍스트 라인). F1 음성.',request:'(내장 데모)',
+ {id:3,name:'DEMO: 촉각 시계',description:'아날로그 시계(그래픽) + 디지털 시각(텍스트 라인). F1 음성.',nameEn:'DEMO: Tactile clock',descEn:'Analog clock (graphic) + digital time (text line). F1 to speak.',request:'(내장 데모)',
   tts_intro:{ko:'촉각 시계입니다. 그래픽 영역에 아날로그 시계, 텍스트 라인에 디지털 시각이 표시됩니다. F1 키를 누르면 시각을 읽어줍니다.',en:'Tactile clock. An analog clock in the graphic area, digital time on the text line. Press F1 to hear the time.'}});
 var RPS=specFeature({template:'rps',params:{}},
- {id:4,name:'DEMO: 가위바위보',description:'F1 가위, F2 바위, F3 보. 컴퓨터 손은 그래픽, 결과는 텍스트 라인+음성.',request:'(내장 데모)',
+ {id:4,name:'DEMO: 가위바위보',description:'F1 가위, F2 바위, F3 보. 컴퓨터 손은 그래픽, 결과는 텍스트 라인+음성.',nameEn:'DEMO: Rock paper scissors',descEn:'F1 scissors, F2 rock, F3 paper. Computer hand in graphic, result on text line + voice.',request:'(내장 데모)',
   tts_intro:{ko:'가위바위보 게임입니다. F1은 가위, F2는 바위, F3은 보입니다. 키를 누르면 컴퓨터와 대결합니다.',en:'Rock paper scissors. F1 scissors, F2 rock, F3 paper. Press a key to play against the computer.'}});
 var MAZE=specFeature({template:'maze',params:{}},
- {id:5,name:'DEMO: 미로 탈출',description:'F1 위, F4 아래, 팬 키 좌우. 우하단 출구까지 이동.',request:'(내장 데모)',
+ {id:5,name:'DEMO: 미로 탈출',description:'F1 위, F4 아래, 팬 키 좌우. 우하단 출구까지 이동.',nameEn:'DEMO: Maze escape',descEn:'F1 up, F4 down, pan keys left/right. Reach the bottom-right exit.',request:'(내장 데모)',
   tts_intro:{ko:'미로 탈출 게임입니다. F1은 위, F4는 아래, 팬 키는 좌우 이동입니다. 오른쪽 아래 출구를 찾으세요.',en:'Maze escape. F1 up, F4 down, pan keys move left and right. Find the exit at the bottom right.'}});
 var SINE=specFeature({template:'plot',params:{fn:'sin'}},
- {id:6,name:'DEMO: 사인 곡선',description:'F1로 주기 변경(1~6). 텍스트 라인에 현재 주기 표시.',request:'(내장 데모)',
+ {id:6,name:'DEMO: 사인 곡선',description:'F1로 주기 변경(1~6). 텍스트 라인에 현재 주기 표시.',nameEn:'DEMO: Sine wave',descEn:'F1 changes cycles (1-6). Current cycle shown on the text line.',request:'(내장 데모)',
   tts_intro:{ko:'사인 곡선 그래프입니다. F1 키를 누르면 주기가 바뀝니다.',en:'Sine wave graph. Press F1 to change the number of cycles.'}});
 var LIVE=specFeature({template:'caption',params:{}},
- {id:7,name:'DEMO: 라이브 점자 자막',description:'마이크로 말하면 그래픽 영역에 멀티라인 점자 자막이 실시간 표시. F1 지우기, F2 일시정지/재개.',request:'(내장 데모)',
+ {id:7,name:'DEMO: 라이브 점자 자막',description:'마이크로 말하면 그래픽 영역에 멀티라인 점자 자막이 실시간 표시. F1 지우기, F2 일시정지/재개.',nameEn:'DEMO: Live braille caption',descEn:'Speak and multiline braille appears live in the graphic area. F1 clear, F2 pause/resume, F3 KO/EN.',request:'(내장 데모)',
   tts_intro:{ko:'라이브 점자 자막입니다. 지금부터 말하면 그래픽 영역에 점자로 실시간 표시됩니다. 화면이 차면 자동으로 넘어갑니다. F1은 지우기, F2는 일시정지와 재개, F3은 한국어와 영어 인식 전환입니다. 영어로 말할 때는 F3을 눌러 영어로 바꾸세요.',en:'Live braille caption. Speak now and it appears in braille in real time. The display scrolls when full. F1 clears, F2 pauses and resumes, F3 switches recognition between Korean and English.'}});
 var MINUTES=specFeature({template:'minutes',params:{}},
- {id:8,name:'DEMO: 회의록',description:'마이크로 말하면 문장 단위로 타임스탬프와 함께 누적 기록. 점자 실시간 표시 + 팬 키로 이전 문장 검토, F1으로 .txt 파일 저장. F1 저장, F2 일시정지, F3 라이브, F4 지우기.',request:'(내장 데모)',
+ {id:8,name:'DEMO: 회의록',description:'마이크로 말하면 문장 단위로 타임스탬프와 함께 누적 기록. 점자 실시간 표시 + 팬 키로 이전 문장 검토, F1으로 .txt 파일 저장. F1 저장, F2 일시정지, F3 라이브, F4 지우기.',nameEn:'DEMO: Meeting minutes',descEn:'Speech logged per sentence with timestamps. Live braille + pan to review, F1 saves a .txt. F1 save, F2 pause, F3 KO/EN, F4 clear.',request:'(내장 데모)',
   tts_intro:{ko:'회의록입니다. 말하면 문장이 시간과 함께 차곡차곡 기록됩니다. 팬 키로 이전 문장을 다시 듣고, 끝까지 넘기면 실시간으로 돌아옵니다. F1은 파일 저장, F2는 일시정지, F3은 한국어와 영어 인식 전환, F4는 모두 지우기입니다. 영어로 말할 때는 F3으로 영어로 바꾸면 영어가 그대로 기록됩니다.',en:'Meeting minutes. As you speak, each sentence is logged with a timestamp. Use the pan keys to review earlier lines; pan past the end to return to live. F1 saves to a file, F2 pauses, F3 switches recognition between Korean and English, F4 clears.'}});
 library.push(DEMO);library.push(DICE);library.push(CLOCK);library.push(RPS);library.push(MAZE);library.push(SINE);library.push(LIVE);library.push(MINUTES);
 loadFeature(DEMO,false);renderLibrary();
@@ -2310,6 +2313,8 @@ function applyLang(){
   document.querySelectorAll('.chip[data-ko]').forEach(function(c){c.textContent=(LANG==='en'?c.getAttribute('data-en'):c.getAttribute('data-ko'));});
   document.documentElement.lang=LANG;
   var lb=document.getElementById('langBtn');if(lb)lb.textContent=(LANG==='en'?'KO':'EN');
+  try{if(typeof renderLibrary==='function')renderLibrary();}catch(e){}                       // 라이브러리 이름·설명 언어 갱신
+  try{if(window.featureNameEl&&window.currentFeature)featureNameEl.textContent=fName(currentFeature)||'—';}catch(e){}
   try{if(typeof applyKeymap==='function'&&window.currentFeature)applyKeymap(currentFeature.spec?currentFeature.spec.template:null);}catch(e){}
   // TTS 버튼 상태 텍스트가 켜짐/꺼짐을 반영 중이면 현재 상태 유지하며 언어만 교체
 }
@@ -2796,7 +2801,7 @@ document.getElementById('syncBtn').addEventListener('click',function(){
       var f=builtin[ko];
       if(f){
         loadFeature(f);contextFeature=f;
-        addMsg('ai','<span class="ftitle">\u25B8 '+escapeHtml(f.name)+'</span><div class="small">'+t('dyn.demo')+'</div>');
+        addMsg('ai','<span class="ftitle">\u25B8 '+escapeHtml(fName(f))+'</span><div class="small">'+t('dyn.demo')+'</div>');
       }else{
         input.value=ko+' 기능 만들어줘';input.focus();
       }
