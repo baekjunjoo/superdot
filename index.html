@@ -948,7 +948,7 @@ function createDP(){
       recog.onend=function(){
         if(!dead&&recog){try{recog.start();}catch(e){}}   // 연속 모드 자동 재시작
       };
-      try{recog.start();logRow('<span class="key">[MIC] 연속 음성 인식 시작 ('+recog.lang+')</span>');}catch(e){logErr('음성 인식 시작 실패: '+e.message);return false;}
+      try{recog.start();micActive(true);logRow('<span class="key">[MIC] 연속 음성 인식 시작 ('+recog.lang+')</span>');}catch(e){logErr('음성 인식 시작 실패: '+e.message);return false;}   // 마이크 보정을 즉시 적용(인트로 음성이 onstart 전에 재생돼 100%로 크게 나가던 문제 수정)
       return true;
     },
     setListenLang:function(code){                           // 인식 언어 전환(ko|en|ja) — 같은 콜백 유지하며 재시작
