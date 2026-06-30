@@ -398,6 +398,17 @@
         </div>
       </div>
       <div class="field">
+        <label>회의록 저장 형식 — Minutes file format</label>
+        <select id="cfgMinFmt">
+          <option value="txt">텍스트 (.txt)</option>
+          <option value="md">마크다운 (.md)</option>
+          <option value="csv">CSV (.csv)</option>
+          <option value="html">HTML (.html)</option>
+          <option value="json">JSON (.json)</option>
+        </select>
+        <div class="note">회의록 기능에서 F1으로 저장할 때 이 형식으로 내보냅니다.</div>
+      </div>
+      <div class="field">
         <label>TTS Voice — 음성 안내 목소리</label>
         <div style="display:flex;gap:6px">
           <select id="cfgVoice" style="flex:1"><option value="">자동 — 기기 내 최고 품질 선택 (권장)</option></select>
@@ -1424,16 +1435,39 @@ minutes:{
    if(!L.length){dp.speak(dp.L('아직 저장할 내용이 없습니다.','Nothing to save yet.'));return;}
    var d=new Date(),z=function(n){return(n<10?'0':'')+n;};
    var name=d.getFullYear()+z(d.getMonth()+1)+z(d.getDate())+'-'+z(d.getHours())+z(d.getMinutes())+z(d.getSeconds());
-   var head=dp.L('Super Dot 회의록','Super Dot Meeting Minutes')+'\n'+dp.L('일시: ','Date: ')+d.toLocaleString()+'\n------------------------------\n';
-   var body=L.map(function(l){return '['+l.t+'] '+l.s;}).join('\n');
+   var fmt=(window.SD&&SD.cfg&&SD.cfg.minutesFmt)||'txt';
+   var title=dp.L('Super Dot 회의록','Super Dot Meeting Minutes');
+   var content,mime;
+   if(fmt==='md'){
+     content='# '+title+'\n\n'+dp.L('일시: ','Date: ')+d.toLocaleString()+'\n\n'+L.map(function(l){return '- **['+l.t+']** '+l.s;}).join('\n')+'\n';
+     mime='text/markdown;charset=utf-8';
+   }else if(fmt==='csv'){
+     var esc=function(s){return '"'+String(s).replace(/"/g,'""')+'"';};
+     content='﻿'+dp.L('시각,내용','time,text')+'\n'+L.map(function(l){return esc(l.t)+','+esc(l.s);}).join('\n')+'\n';
+     mime='text/csv;charset=utf-8';
+   }else if(fmt==='html'){
+     var he=function(s){return String(s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});};
+     content='<!doctype html><html lang="'+LANG+'"><meta charset="utf-8"><title>'+he(title)+'</title>'+
+       '<body style="font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:40px auto;line-height:1.6;padding:0 16px"><h1>'+he(title)+'</h1>'+
+       '<p>'+dp.L('일시: ','Date: ')+he(d.toLocaleString())+'</p><ol>'+
+       L.map(function(l){return '<li><time style="color:#888">['+he(l.t)+']</time> '+he(l.s)+'</li>';}).join('')+'</ol></body></html>';
+     mime='text/html;charset=utf-8';
+   }else if(fmt==='json'){
+     content=JSON.stringify({title:title,date:d.toISOString(),lines:L.map(function(l){return {time:l.t,text:l.s};})},null,2);
+     mime='application/json;charset=utf-8';
+   }else{
+     fmt='txt';
+     content=title+'\n'+dp.L('일시: ','Date: ')+d.toLocaleString()+'\n------------------------------\n'+L.map(function(l){return '['+l.t+'] '+l.s;}).join('\n')+'\n';
+     mime='text/plain;charset=utf-8';
+   }
    try{
-    var blob=new Blob([head+body+'\n'],{type:'text/plain;charset=utf-8'});
+    var blob=new Blob([content],{type:mime});
     var url=URL.createObjectURL(blob),a=document.createElement('a');
-    a.href=url;a.download=dp.L('회의록-','minutes-')+name+'.txt';
+    a.href=url;a.download=dp.L('회의록-','minutes-')+name+'.'+fmt;
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     dp.timeout(2000,function(){URL.revokeObjectURL(url);});
-    dp.textLine('saved '+L.length);
-    dp.speak(dp.L(L.length+'문장을 파일로 저장했습니다.','Saved '+L.length+' lines to a file.'));
+    dp.textLine('saved '+fmt+' '+L.length);
+    dp.speak(dp.L(L.length+'문장을 '+fmt.toUpperCase()+' 파일로 저장했습니다.','Saved '+L.length+' lines as '+fmt.toUpperCase()+'.'));
    }catch(e){logErr('회의록 저장 실패: '+e.message);dp.speak(dp.L('저장에 실패했습니다.','Save failed.'));}
   }
   dp.textLine('minutes rec');render();
@@ -2388,6 +2422,7 @@ var SD={
     fApi.value=SD.cfg.api||'';fSvc.value=SD.cfg.svc||'';fChr.value=SD.cfg.chr||'';
     fEnc.value=SD.cfg.enc||'cells';fWr.value=SD.cfg.write||'nores-20';fGr.value=SD.cfg.grade||'g2';
     fEng.value=SD.cfg.engine||'builtin';updateLL();fillVoices();
+    var fMin=document.getElementById('cfgMinFmt');if(fMin)fMin.value=SD.cfg.minutesFmt||'txt';
     fVol.value=SD.cfg.vol!=null?SD.cfg.vol:100;fVolMic.value=SD.cfg.volMic!=null?SD.cfg.volMic:50;fRate.value=SD.cfg.rate!=null?SD.cfg.rate:105;volLabels();
     bg.classList.add('open');
   }
@@ -2399,7 +2434,7 @@ var SD={
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&bg.classList.contains('open'))close();});
   document.getElementById('cfgSave').addEventListener('click',function(){
     SD.cfg.api=fApi.value.trim();SD.cfg.svc=fSvc.value.trim().toLowerCase();SD.cfg.chr=fChr.value.trim().toLowerCase();
-    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.cfg.engine=fEng.value;SD.cfg.voice=fVoice.value;SD.cfg.vol=parseInt(fVol.value,10);SD.cfg.volMic=parseInt(fVolMic.value,10);SD.cfg.rate=parseInt(fRate.value,10);TTSV.byLang={};refreshVoices();SD.save();close();
+    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.cfg.engine=fEng.value;SD.cfg.voice=fVoice.value;SD.cfg.vol=parseInt(fVol.value,10);SD.cfg.volMic=parseInt(fVolMic.value,10);SD.cfg.rate=parseInt(fRate.value,10);var fMin=document.getElementById('cfgMinFmt');if(fMin)SD.cfg.minutesFmt=fMin.value;TTSV.byLang={};refreshVoices();SD.save();close();
     if(SD.cfg.engine==='liblouis'&&LL.status!=='ready'){
       LL.load(function(ok3){updateLL();logRow('<span class="key">[SETUP] '+escapeHtml(llStatText())+'</span>');if(ok3&&currentFeature)loadFeature(currentFeature,false);});
     }
