@@ -352,9 +352,10 @@
           </select>
         </div>
         <div class="field">
-          <label>NVIDIA ASR 프록시 URL</label>
-          <input id="cfgNimAsr" type="text" placeholder="https://your-asr-proxy.workers.dev" spellcheck="false">
-          <div class="note">프록시 계약: POST(FormData: audio=오디오, language=auto), 응답 JSON {"text":"..."}. NVIDIA Whisper/Canary ASR로 포워딩. 미설정·실패 시 브라우저 인식으로 자동 폴백.</div>
+          <label>NVIDIA NIM 프록시 URL</label>
+          <input id="cfgNimApi" type="text" placeholder="https://your-nim-proxy.workers.dev" spellcheck="false">
+          <div class="note">키 1개·프록시 1개로 처리. 경로: {URL}/asr, {URL}/translate. 미설정·실패 시 자동 폴백(자막=브라우저 인식, 번역=Anthropic).</div>
+          <label style="display:flex;align-items:center;gap:6px;margin-top:6px"><input type="checkbox" id="cfgAsrDenoise"> 마이크 잡음 제거(NVIDIA Maxine · ASR 전처리)</label>
         </div>
       </div>
       <div class="frow">
@@ -589,6 +590,8 @@ var BRAILLE={a:[1],b:[1,2],c:[1,4],d:[1,4,5],e:[1,5],f:[1,2,4],g:[1,2,4,5],h:[1,
 var NUMSIGN=[3,4,5,6],DIGITMAP={'1':'a','2':'b','3':'c','4':'d','5':'e','6':'f','7':'g','8':'h','9':'i','0':'j'};
 function drawCell(buf,dots,x,y){var pos={1:[0,0],2:[0,1],3:[0,2],4:[1,0],5:[1,1],6:[1,2]};for(var n=0;n<dots.length;n++){var p=pos[dots[n]],px=x+p[0],py=y+p[1];if(px>=0&&px<W&&py>=0&&py<H)buf[py*W+px]=1;}}
 function dotsToByte(dots){var b=0;for(var i=0;i<dots.length;i++)b|=(1<<(dots[i]-1));return b;}
+/* NVIDIA NIM 프록시 베이스 URL(키 1개·프록시 1개로 asr/translate 라우팅). 미설정이면 '' → 폴백. */
+function nimBase(){return ((window.SD&&SD.cfg&&SD.cfg.nimApi)||'').trim().replace(/\/+$/,'');}
 /* ── eBraille(.ebrl) 내보내기: 순수 JS OCF ZIP(저장 방식)+CRC32, 본문은 유니코드 점자(U+2800) ── */
 var _crcT=(function(){var t=[];for(var n=0;n<256;n++){var c=n;for(var k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
 function crc32(b){var c=0xFFFFFFFF;for(var i=0;i<b.length;i++)c=_crcT[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
@@ -996,7 +999,7 @@ function createDP(){
       if(opts&&opts.lang)dp._listenLang=opts.lang;
       if(!dp._listenLang)dp._listenLang=(LANG==='en'?'en':'ko');
       // NVIDIA ASR 백엔드(설정 시): 다국어 자동 인식. 실패 시 브라우저 인식으로 폴백.
-      if(window.SD&&SD.cfg&&SD.cfg.asr==='nvidia'&&SD.cfg.nimAsr&&SD.cfg.nimAsr.trim()){
+      if(window.SD&&SD.cfg&&SD.cfg.asr==='nvidia'&&nimBase()){
         if(dp._startNimAsr())return true;
       }
       var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -1041,7 +1044,7 @@ function createDP(){
     _startNimAsr:function(){                                 // NVIDIA NIM ASR — ~4초 구간 녹음 → 프록시 POST → 전사(자동 언어감지)
       if(dead||!dp._listenFn)return false;
       if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==='undefined'){logErr('이 브라우저는 녹음을 지원하지 않아 브라우저 인식으로 전환합니다.');return false;}
-      var url=window.SD&&SD.cfg&&SD.cfg.nimAsr&&SD.cfg.nimAsr.trim();if(!url)return false;
+      if(!nimBase())return false;
       micActive(true);
       navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
         if(dead){stream.getTracks().forEach(function(t){t.stop();});return;}
@@ -1066,9 +1069,9 @@ function createDP(){
       return true;
     },
     _nimSend:function(blob){
-      var url=window.SD&&SD.cfg&&SD.cfg.nimAsr&&SD.cfg.nimAsr.trim();if(!url)return;
-      var fd=new FormData();fd.append('audio',blob,'chunk.webm');fd.append('language',(SD.cfg.asrLang||'auto'));
-      fetch(url,{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(j){
+      var base=nimBase();if(!base)return;
+      var fd=new FormData();fd.append('audio',blob,'chunk.webm');fd.append('language',(SD.cfg.asrLang||'auto'));fd.append('denoise',(SD.cfg.asrDenoise?'true':'false'));
+      fetch(base+'/asr',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(j){
         if(dead)return;var txt=((j&&(j.text||j.transcript||j.result))||'').trim();
         if(txt){try{dp._listenFn(txt,true);}catch(e){logErr('ASR 콜백 오류: '+e.message);}}
       }).catch(function(e){if(!dp._nimWarned){dp._nimWarned=true;logErr('NVIDIA ASR 요청 실패: '+e.message);}});
@@ -1840,13 +1843,23 @@ xlate:{
   dp.state.txt='';dp.state.on=true;dp.state.warned=false;
   function render(){drawBrailleBlock(dp,dp.state.txt);}
   dp.textLine('translate '+to);render();
+  function onTrans(out){out=(out||'').trim();if(!out)return;dp.state.txt+=out+' ';render();dp.speak(out);}
+  function transFail(){if(!dp.state.warned){dp.state.warned=true;dp.speak(dp.L('번역 서버에 연결할 수 없습니다. 설정을 확인하세요.','Cannot reach translation server. Check setup.'));}}
   function translate(src){
    try{
-    fetch(SD.api(),{method:'POST',headers:{'Content-Type':'application/json'},
+    var nb=nimBase();
+    if(nb){   // NVIDIA NIM 번역(riva-translate) 경로
+     fetch(nb+'/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:src,target:to})})
+     .then(function(r){return r.json();})
+     .then(function(j){onTrans((j&&(j.text||j.translation||j.result))||'');})
+     .catch(transFail);
+     return;
+    }
+    fetch(SD.api(),{method:'POST',headers:{'Content-Type':'application/json'},   // 폴백: Anthropic 프록시
      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,system:'You are a translator. Translate the user text to '+langName+'. Output only the translation, no notes.',messages:[{role:'user',content:src}]})})
     .then(function(r){return r.json();})
-    .then(function(j){if(j.error)throw new Error(j.error.message||'api');var out=(j.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join(' ').trim();if(!out)return;dp.state.txt+=out+' ';render();dp.speak(out);})
-    .catch(function(){if(!dp.state.warned){dp.state.warned=true;dp.speak(dp.L('번역 서버에 연결할 수 없습니다. 설정에서 프록시 API를 확인하세요.','Cannot reach translation server. Check the proxy API in setup.'));}});
+    .then(function(j){if(j.error)throw new Error(j.error.message||'api');onTrans((j.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join(' '));})
+    .catch(transFail);
    }catch(e){}
   }
   dp.listen(function(t,fin){if(!dp.state.on)return;if(fin){var s=String(t).trim();if(s)translate(s);}});
@@ -2535,7 +2548,8 @@ var SD={
     fEng.value=SD.cfg.engine||'builtin';updateLL();fillVoices();
     var fMin=document.getElementById('cfgMinFmt');if(fMin)fMin.value=SD.cfg.minutesFmt||'txt';
     var fAsr=document.getElementById('cfgAsr');if(fAsr)fAsr.value=SD.cfg.asr||'web';
-    var fNimAsr=document.getElementById('cfgNimAsr');if(fNimAsr)fNimAsr.value=SD.cfg.nimAsr||'';
+    var fNimApi=document.getElementById('cfgNimApi');if(fNimApi)fNimApi.value=SD.cfg.nimApi||'';
+    var fDn=document.getElementById('cfgAsrDenoise');if(fDn)fDn.checked=!!SD.cfg.asrDenoise;
     fVol.value=SD.cfg.vol!=null?SD.cfg.vol:100;fVolMic.value=SD.cfg.volMic!=null?SD.cfg.volMic:50;fRate.value=SD.cfg.rate!=null?SD.cfg.rate:105;volLabels();
     bg.classList.add('open');
   }
@@ -2547,7 +2561,7 @@ var SD={
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&bg.classList.contains('open'))close();});
   document.getElementById('cfgSave').addEventListener('click',function(){
     SD.cfg.api=fApi.value.trim();SD.cfg.svc=fSvc.value.trim().toLowerCase();SD.cfg.chr=fChr.value.trim().toLowerCase();
-    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.cfg.engine=fEng.value;SD.cfg.voice=fVoice.value;SD.cfg.vol=parseInt(fVol.value,10);SD.cfg.volMic=parseInt(fVolMic.value,10);SD.cfg.rate=parseInt(fRate.value,10);var fMin=document.getElementById('cfgMinFmt');if(fMin)SD.cfg.minutesFmt=fMin.value;var fAsr=document.getElementById('cfgAsr');if(fAsr)SD.cfg.asr=fAsr.value;var fNimAsr=document.getElementById('cfgNimAsr');if(fNimAsr)SD.cfg.nimAsr=fNimAsr.value.trim();TTSV.byLang={};refreshVoices();SD.save();close();
+    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.cfg.engine=fEng.value;SD.cfg.voice=fVoice.value;SD.cfg.vol=parseInt(fVol.value,10);SD.cfg.volMic=parseInt(fVolMic.value,10);SD.cfg.rate=parseInt(fRate.value,10);var fMin=document.getElementById('cfgMinFmt');if(fMin)SD.cfg.minutesFmt=fMin.value;var fAsr=document.getElementById('cfgAsr');if(fAsr)SD.cfg.asr=fAsr.value;var fNimApi=document.getElementById('cfgNimApi');if(fNimApi)SD.cfg.nimApi=fNimApi.value.trim();var fDn=document.getElementById('cfgAsrDenoise');if(fDn)SD.cfg.asrDenoise=fDn.checked;TTSV.byLang={};refreshVoices();SD.save();close();
     if(SD.cfg.engine==='liblouis'&&LL.status!=='ready'){
       LL.load(function(ok3){updateLL();logRow('<span class="key">[SETUP] '+escapeHtml(llStatText())+'</span>');if(ok3&&currentFeature)loadFeature(currentFeature,false);});
     }
