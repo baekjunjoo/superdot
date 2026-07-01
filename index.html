@@ -347,7 +347,8 @@
         <div class="field">
           <label>음성 인식 엔진 — Speech recognition</label>
           <select id="cfgAsr">
-            <option value="web">브라우저 내장 — 오프라인 · 한 번에 한 언어(F3 전환)</option>
+            <option value="web">브라우저 내장 — 온라인 · 한 번에 한 언어(F3 전환)</option>
+            <option value="whisper">온디바이스 Whisper — 오프라인 다국어(최초 모델 다운로드)</option>
             <option value="nvidia">NVIDIA NIM — 다국어 자동감지(프록시 필요)</option>
           </select>
         </div>
@@ -592,6 +593,18 @@ function drawCell(buf,dots,x,y){var pos={1:[0,0],2:[0,1],3:[0,2],4:[1,0],5:[1,1]
 function dotsToByte(dots){var b=0;for(var i=0;i<dots.length;i++)b|=(1<<(dots[i]-1));return b;}
 /* NVIDIA NIM 프록시 베이스 URL(키 1개·프록시 1개로 asr/translate 라우팅). 미설정이면 '' → 폴백. */
 function nimBase(){return ((window.SD&&SD.cfg&&SD.cfg.nimApi)||'').trim().replace(/\/+$/,'');}
+/* 온디바이스 Whisper(ASR) — transformers.js를 CDN에서 지연 로드, 파이프라인 캐시. 오프라인 다국어 자동인식. */
+var _wsp=null;
+function whisperLoad(){
+  if(_wsp)return _wsp;
+  var model=(window.SD&&SD.cfg&&SD.cfg.whisperModel)||'Xenova/whisper-tiny';
+  _wsp=import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0').then(function(T){
+    try{T.env.allowLocalModels=false;}catch(e){}
+    return T.pipeline('automatic-speech-recognition',model,{device:'webgpu',dtype:'q8'})
+      .catch(function(){return T.pipeline('automatic-speech-recognition',model);});   // WebGPU 없으면 WASM 폴백
+  });
+  return _wsp;
+}
 /* 온디바이스 번역 — 크롬 내장 Translator/LanguageDetector API. 미지원이면 Promise<null> → 원격 폴백. */
 var _odTr={},_odDet=null;
 function odTranslate(text,target){
@@ -1018,6 +1031,9 @@ function createDP(){
       if(opts&&opts.lang)dp._listenLang=opts.lang;
       if(!dp._listenLang)dp._listenLang=(LANG==='en'?'en':'ko');
       // NVIDIA ASR 백엔드(설정 시): 다국어 자동 인식. 실패 시 브라우저 인식으로 폴백.
+      if(window.SD&&SD.cfg&&SD.cfg.asr==='whisper'){
+        if(dp._startWhisper())return true;
+      }
       if(window.SD&&SD.cfg&&SD.cfg.asr==='nvidia'&&nimBase()){
         if(dp._startNimAsr())return true;
       }
@@ -1055,7 +1071,7 @@ function createDP(){
     },
     setListenLang:function(code){                           // 인식 언어 전환(ko|en|ja) — 같은 콜백 유지하며 재시작
       dp._listenLang=code;
-      if(dp._nim){dp._stopNim();return dp._startNimAsr();}   // NVIDIA는 자동 감지 — 깨끗이 재시작만
+      if(dp._nim){var w=dp._nim.whisper;dp._stopNim();return w?dp._startWhisper():dp._startNimAsr();}   // 캡처형(Whisper/NVIDIA)은 깨끗이 재시작
       if(recog){var r=recog;recog=null;try{r.onend=null;r.stop();}catch(e){}}
       micActive(false);
       return dp._startRecog();
@@ -1098,6 +1114,55 @@ function createDP(){
     },
     _stopNim:function(){
       if(dp._nim){dp._nim.on=false;try{if(dp._nim.timer)clearTimeout(dp._nim.timer);}catch(e){}try{if(dp._nim.rec&&dp._nim.rec.state!=='inactive')dp._nim.rec.stop();}catch(e){}try{dp._nim.stream.getTracks().forEach(function(t){t.stop();});}catch(e){}dp._nim=null;}
+    },
+    _startWhisper:function(){                                // 온디바이스 Whisper(WASM/WebGPU) — 캡처→디코드→전사(자동 언어감지)
+      if(dead||!dp._listenFn)return false;
+      if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==='undefined'){logErr('녹음 미지원 — 브라우저 인식으로 전환');return false;}
+      micActive(true);
+      logRow('<span class="key">[MIC] 온디바이스 Whisper 로딩… (최초 1회 모델 다운로드)</span>');
+      whisperLoad().then(function(pipe){
+        if(dead)return;dp._wpipe=pipe;
+        logRow('<span class="key">[MIC] Whisper 준비됨 · 오프라인 자동 언어감지</span>');
+        navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:true,echoCancellation:true,autoGainControl:true}}).then(function(stream){
+          if(dead){stream.getTracks().forEach(function(t){t.stop();});return;}
+          dp._nim={stream:stream,rec:null,timer:null,on:true,whisper:true};
+          (function cycle(){
+            if(dead||!dp._nim||!dp._nim.on)return;
+            var mt=(typeof MediaRecorder!=='undefined'&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported('audio/webm'))?'audio/webm':'';
+            var rec;try{rec=mt?new MediaRecorder(stream,{mimeType:mt}):new MediaRecorder(stream);}catch(e){logErr('녹음 시작 실패: '+e.message);return;}
+            dp._nim.rec=rec;var chunks=[];
+            rec.ondataavailable=function(ev){if(ev.data&&ev.data.size)chunks.push(ev.data);};
+            rec.onstop=function(){
+              if(chunks.length)dp._whisperTranscribe(new Blob(chunks,{type:rec.mimeType||'audio/webm'}));
+              if(!dead&&dp._nim&&dp._nim.on)dp._nim.timer=setTimeout(cycle,10);
+            };
+            try{rec.start();}catch(e){logErr('녹음 시작 실패: '+e.message);return;}
+            dp._nim.timer=setTimeout(function(){try{if(rec.state!=='inactive')rec.stop();}catch(e){}},4000);
+          })();
+        }).catch(function(e){logErr('마이크 접근 실패: '+e.message+' — 브라우저 인식으로 전환');dp._nim=null;dp._startRecog();});
+      }).catch(function(e){logErr('Whisper 로드 실패: '+e.message+' — 브라우저 인식으로 전환');dp._startRecog();});
+      return true;
+    },
+    _whisperTranscribe:function(blob){
+      if(dead||!dp._wpipe)return;
+      dp._wDecode(blob).then(function(pcm){
+        if(dead||!pcm||!pcm.length)return null;
+        return dp._wpipe(pcm,{task:'transcribe',chunk_length_s:30});
+      }).then(function(out){
+        if(dead||!out)return;var txt=((out.text)||'').trim();
+        if(txt&&!/^\s*[\[(][^\])]*[\])]\s*$/.test(txt)){try{dp._listenFn(txt,true);}catch(e){logErr('Whisper 콜백 오류: '+e.message);}}   // [BLANK_AUDIO] 등 잡음 토큰 제외
+      }).catch(function(e){if(!dp._wWarned){dp._wWarned=true;logErr('Whisper 전사 오류: '+e.message);}});
+    },
+    _wDecode:function(blob){                                 // webm/opus → 16kHz mono Float32 (Whisper 입력)
+      return blob.arrayBuffer().then(function(ab){
+        var AC=window.AudioContext||window.webkitAudioContext;var ac=new AC();
+        return ac.decodeAudioData(ab).then(function(buf){try{ac.close();}catch(e){}
+          var OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+          var len=Math.max(1,Math.ceil(buf.duration*16000));
+          var off=new OAC(1,len,16000);var s=off.createBufferSource();s.buffer=buf;s.connect(off.destination);s.start();
+          return off.startRendering().then(function(r){return r.getChannelData(0);});
+        });
+      });
     },
     stopListen:function(){
       dp._stopNim();
