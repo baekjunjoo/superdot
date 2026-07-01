@@ -345,6 +345,20 @@
       </div>
       <div class="frow">
         <div class="field">
+          <label>음성 인식 엔진 — Speech recognition</label>
+          <select id="cfgAsr">
+            <option value="web">브라우저 내장 — 오프라인 · 한 번에 한 언어(F3 전환)</option>
+            <option value="nvidia">NVIDIA NIM — 다국어 자동감지(프록시 필요)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>NVIDIA ASR 프록시 URL</label>
+          <input id="cfgNimAsr" type="text" placeholder="https://your-asr-proxy.workers.dev" spellcheck="false">
+          <div class="note">프록시 계약: POST(FormData: audio=오디오, language=auto), 응답 JSON {"text":"..."}. NVIDIA Whisper/Canary ASR로 포워딩. 미설정·실패 시 브라우저 인식으로 자동 폴백.</div>
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field">
           <label>BLE Service UUID</label>
           <input id="cfgSvc" type="text" placeholder="기본: 49535343-fe7d-4ae5-8fa9-9fafd205e455" spellcheck="false">
         </div>
@@ -976,13 +990,17 @@ function createDP(){
     L:function(ko,en){return (LANG==='en'&&en!=null)?en:ko;},
     listen:function(fn,opts){
       if(dead)return false;
-      var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-      if(!SR){tts(LANG==='en'?'Speech recognition is not supported in this browser. Please use Chrome.':'이 브라우저는 음성 인식을 지원하지 않습니다. 크롬에서 열어주세요.');return false;}
       if(window.stopDictation)stopDictation();   // MIC 받아쓰기와 동시 실행 불가 — 충돌 방지
       dp.stopListen();
       dp._listenFn=fn;
       if(opts&&opts.lang)dp._listenLang=opts.lang;
       if(!dp._listenLang)dp._listenLang=(LANG==='en'?'en':'ko');
+      // NVIDIA ASR 백엔드(설정 시): 다국어 자동 인식. 실패 시 브라우저 인식으로 폴백.
+      if(window.SD&&SD.cfg&&SD.cfg.asr==='nvidia'&&SD.cfg.nimAsr&&SD.cfg.nimAsr.trim()){
+        if(dp._startNimAsr())return true;
+      }
+      var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+      if(!SR){tts(LANG==='en'?'Speech recognition is not supported in this browser. Please use Chrome.':'이 브라우저는 음성 인식을 지원하지 않습니다. 크롬에서 열어주세요.');return false;}
       return dp._startRecog();
     },
     _startRecog:function(){                                 // 현재 dp._listenLang으로 연속 인식 (재)시작
@@ -1015,11 +1033,51 @@ function createDP(){
     },
     setListenLang:function(code){                           // 인식 언어 전환(ko|en|ja) — 같은 콜백 유지하며 재시작
       dp._listenLang=code;
+      if(dp._nim){dp._stopNim();return dp._startNimAsr();}   // NVIDIA는 자동 감지 — 깨끗이 재시작만
       if(recog){var r=recog;recog=null;try{r.onend=null;r.stop();}catch(e){}}
       micActive(false);
       return dp._startRecog();
     },
+    _startNimAsr:function(){                                 // NVIDIA NIM ASR — ~4초 구간 녹음 → 프록시 POST → 전사(자동 언어감지)
+      if(dead||!dp._listenFn)return false;
+      if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==='undefined'){logErr('이 브라우저는 녹음을 지원하지 않아 브라우저 인식으로 전환합니다.');return false;}
+      var url=window.SD&&SD.cfg&&SD.cfg.nimAsr&&SD.cfg.nimAsr.trim();if(!url)return false;
+      micActive(true);
+      navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+        if(dead){stream.getTracks().forEach(function(t){t.stop();});return;}
+        dp._nim={stream:stream,rec:null,timer:null,on:true};
+        logRow('<span class="key">[MIC] NVIDIA ASR 시작 · 자동 언어감지</span>');
+        (function cycle(){
+          if(dead||!dp._nim||!dp._nim.on)return;
+          var mt=(typeof MediaRecorder!=='undefined'&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported('audio/webm'))?'audio/webm':'';
+          var rec;try{rec=mt?new MediaRecorder(stream,{mimeType:mt}):new MediaRecorder(stream);}catch(e){logErr('녹음 시작 실패: '+e.message);return;}
+          dp._nim.rec=rec;var chunks=[];
+          rec.ondataavailable=function(ev){if(ev.data&&ev.data.size)chunks.push(ev.data);};
+          rec.onstop=function(){
+            if(chunks.length)dp._nimSend(new Blob(chunks,{type:rec.mimeType||'audio/webm'}));
+            if(!dead&&dp._nim&&dp._nim.on)dp._nim.timer=setTimeout(cycle,10);
+          };
+          try{rec.start();}catch(e){logErr('녹음 시작 실패: '+e.message);return;}
+          dp._nim.timer=setTimeout(function(){try{if(rec.state!=='inactive')rec.stop();}catch(e){}},4000);
+        })();
+      }).catch(function(e){
+        logErr('마이크 접근 실패: '+e.message+' — 브라우저 인식으로 전환');dp._nim=null;dp._startRecog();
+      });
+      return true;
+    },
+    _nimSend:function(blob){
+      var url=window.SD&&SD.cfg&&SD.cfg.nimAsr&&SD.cfg.nimAsr.trim();if(!url)return;
+      var fd=new FormData();fd.append('audio',blob,'chunk.webm');fd.append('language',(SD.cfg.asrLang||'auto'));
+      fetch(url,{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(j){
+        if(dead)return;var txt=((j&&(j.text||j.transcript||j.result))||'').trim();
+        if(txt){try{dp._listenFn(txt,true);}catch(e){logErr('ASR 콜백 오류: '+e.message);}}
+      }).catch(function(e){if(!dp._nimWarned){dp._nimWarned=true;logErr('NVIDIA ASR 요청 실패: '+e.message);}});
+    },
+    _stopNim:function(){
+      if(dp._nim){dp._nim.on=false;try{if(dp._nim.timer)clearTimeout(dp._nim.timer);}catch(e){}try{if(dp._nim.rec&&dp._nim.rec.state!=='inactive')dp._nim.rec.stop();}catch(e){}try{dp._nim.stream.getTracks().forEach(function(t){t.stop();});}catch(e){}dp._nim=null;}
+    },
     stopListen:function(){
+      dp._stopNim();
       if(recog){var r=recog;recog=null;try{r.onend=null;r.stop();}catch(e){}}
       micActive(false);
     },
@@ -1027,7 +1085,7 @@ function createDP(){
     interval:function(ms,fn){var id=setInterval(function(){if(!dead)fn();},ms);timers.push(id);return id;},
     timeout:function(ms,fn){var id=setTimeout(function(){if(!dead)fn();},ms);timers.push(id);return id;},
     _fireKey:function(k){if(keyHandler&&!dead){try{keyHandler(k);}catch(e){logErr('키 핸들러 오류: '+e.message);}}},
-    _destroy:function(){dead=true;if(recog){var r=recog;recog=null;try{r.onend=null;r.stop();}catch(e){}}micActive(false);timers.forEach(function(id){clearInterval(id);clearTimeout(id);});keyHandler=null;}
+    _destroy:function(){dead=true;try{dp._stopNim();}catch(e){}if(recog){var r=recog;recog=null;try{r.onend=null;r.stop();}catch(e){}}micActive(false);timers.forEach(function(id){clearInterval(id);clearTimeout(id);});keyHandler=null;}
   };
   return dp;
 }
@@ -2476,6 +2534,8 @@ var SD={
     fEnc.value=SD.cfg.enc||'cells';fWr.value=SD.cfg.write||'nores-20';fGr.value=SD.cfg.grade||'g2';
     fEng.value=SD.cfg.engine||'builtin';updateLL();fillVoices();
     var fMin=document.getElementById('cfgMinFmt');if(fMin)fMin.value=SD.cfg.minutesFmt||'txt';
+    var fAsr=document.getElementById('cfgAsr');if(fAsr)fAsr.value=SD.cfg.asr||'web';
+    var fNimAsr=document.getElementById('cfgNimAsr');if(fNimAsr)fNimAsr.value=SD.cfg.nimAsr||'';
     fVol.value=SD.cfg.vol!=null?SD.cfg.vol:100;fVolMic.value=SD.cfg.volMic!=null?SD.cfg.volMic:50;fRate.value=SD.cfg.rate!=null?SD.cfg.rate:105;volLabels();
     bg.classList.add('open');
   }
@@ -2487,7 +2547,7 @@ var SD={
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&bg.classList.contains('open'))close();});
   document.getElementById('cfgSave').addEventListener('click',function(){
     SD.cfg.api=fApi.value.trim();SD.cfg.svc=fSvc.value.trim().toLowerCase();SD.cfg.chr=fChr.value.trim().toLowerCase();
-    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.cfg.engine=fEng.value;SD.cfg.voice=fVoice.value;SD.cfg.vol=parseInt(fVol.value,10);SD.cfg.volMic=parseInt(fVolMic.value,10);SD.cfg.rate=parseInt(fRate.value,10);var fMin=document.getElementById('cfgMinFmt');if(fMin)SD.cfg.minutesFmt=fMin.value;TTSV.byLang={};refreshVoices();SD.save();close();
+    SD.cfg.enc=fEnc.value;SD.cfg.write=fWr.value;SD.cfg.grade=fGr.value;SD.cfg.engine=fEng.value;SD.cfg.voice=fVoice.value;SD.cfg.vol=parseInt(fVol.value,10);SD.cfg.volMic=parseInt(fVolMic.value,10);SD.cfg.rate=parseInt(fRate.value,10);var fMin=document.getElementById('cfgMinFmt');if(fMin)SD.cfg.minutesFmt=fMin.value;var fAsr=document.getElementById('cfgAsr');if(fAsr)SD.cfg.asr=fAsr.value;var fNimAsr=document.getElementById('cfgNimAsr');if(fNimAsr)SD.cfg.nimAsr=fNimAsr.value.trim();TTSV.byLang={};refreshVoices();SD.save();close();
     if(SD.cfg.engine==='liblouis'&&LL.status!=='ready'){
       LL.load(function(ok3){updateLL();logRow('<span class="key">[SETUP] '+escapeHtml(llStatText())+'</span>');if(ok3&&currentFeature)loadFeature(currentFeature,false);});
     }
