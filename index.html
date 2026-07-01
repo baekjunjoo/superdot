@@ -592,6 +592,25 @@ function drawCell(buf,dots,x,y){var pos={1:[0,0],2:[0,1],3:[0,2],4:[1,0],5:[1,1]
 function dotsToByte(dots){var b=0;for(var i=0;i<dots.length;i++)b|=(1<<(dots[i]-1));return b;}
 /* NVIDIA NIM 프록시 베이스 URL(키 1개·프록시 1개로 asr/translate 라우팅). 미설정이면 '' → 폴백. */
 function nimBase(){return ((window.SD&&SD.cfg&&SD.cfg.nimApi)||'').trim().replace(/\/+$/,'');}
+/* 온디바이스 번역 — 크롬 내장 Translator/LanguageDetector API. 미지원이면 Promise<null> → 원격 폴백. */
+var _odTr={},_odDet=null;
+function odTranslate(text,target){
+  try{
+    if(typeof Translator==='undefined')return Promise.resolve(null);
+    var srcP=(typeof LanguageDetector!=='undefined')
+      ? (_odDet||(_odDet=LanguageDetector.create())).then(function(d){return d.detect(text);}).then(function(r){return (r&&r[0]&&r[0].detectedLanguage)||'';}).catch(function(){return '';})
+      : Promise.resolve('');
+    return srcP.then(function(src){
+      src=(src||(target==='en'?'ko':'en')).split('-')[0];
+      if(src===target)return text;                         // 이미 대상 언어면 원문 그대로
+      var key=src+'>'+target;
+      var tp=_odTr[key]||(_odTr[key]=Translator.availability({sourceLanguage:src,targetLanguage:target}).then(function(a){
+        return a==='unavailable'?null:Translator.create({sourceLanguage:src,targetLanguage:target});
+      }));
+      return tp.then(function(tr){return tr?tr.translate(text):null;});
+    }).catch(function(){return null;});
+  }catch(e){return Promise.resolve(null);}
+}
 /* ── eBraille(.ebrl) 내보내기: 순수 JS OCF ZIP(저장 방식)+CRC32, 본문은 유니코드 점자(U+2800) ── */
 var _crcT=(function(){var t=[];for(var n=0;n<256;n++){var c=n;for(var k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
 function crc32(b){var c=0xFFFFFFFF;for(var i=0;i<b.length;i++)c=_crcT[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
@@ -1046,7 +1065,8 @@ function createDP(){
       if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==='undefined'){logErr('이 브라우저는 녹음을 지원하지 않아 브라우저 인식으로 전환합니다.');return false;}
       if(!nimBase())return false;
       micActive(true);
-      navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+      // 마이크 잡음 제거(브라우저 내장) — 캡처 단계에서 잡음·에코·게인 보정
+      navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:true,echoCancellation:true,autoGainControl:true}}).then(function(stream){
         if(dead){stream.getTracks().forEach(function(t){t.stop();});return;}
         dp._nim={stream:stream,rec:null,timer:null,on:true};
         logRow('<span class="key">[MIC] NVIDIA ASR 시작 · 자동 언어감지</span>');
@@ -1845,7 +1865,7 @@ xlate:{
   dp.textLine('translate '+to);render();
   function onTrans(out){out=(out||'').trim();if(!out)return;dp.state.txt+=out+' ';render();dp.speak(out);}
   function transFail(){if(!dp.state.warned){dp.state.warned=true;dp.speak(dp.L('번역 서버에 연결할 수 없습니다. 설정을 확인하세요.','Cannot reach translation server. Check setup.'));}}
-  function translate(src){
+  function remoteTranslate(src){
    try{
     var nb=nimBase();
     if(nb){   // NVIDIA NIM 번역(riva-translate) 경로
@@ -1861,6 +1881,9 @@ xlate:{
     .then(function(j){if(j.error)throw new Error(j.error.message||'api');onTrans((j.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join(' '));})
     .catch(transFail);
    }catch(e){}
+  }
+  function translate(src){   // 1순위: 크롬 내장 온디바이스 번역 → 없으면 원격(NIM/Anthropic)
+   odTranslate(src,to).then(function(out){ if(out!=null)onTrans(out); else remoteTranslate(src); });
   }
   dp.listen(function(t,fin){if(!dp.state.on)return;if(fin){var s=String(t).trim();if(s)translate(s);}});
   dp.onKey(function(k){
