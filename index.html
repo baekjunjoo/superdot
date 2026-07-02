@@ -227,8 +227,7 @@
   <div class="navstatus">
     <span>60 &times; 40 BINARY</span>
     <span class="live" id="modeBadge">SIMULATOR</span>
-    <button class="navbtn" id="bleBtn" data-i18n="nav.ble">기기 추가</button>
-    <button class="navbtn" id="bleMultiBtn" data-i18n="nav.bleMulti" title="여러 대에 동시 미러링">기기 여러 대 추가</button>
+    <button class="navbtn" id="bleBtn" data-i18n="nav.ble" title="누를 때마다 기기 1대 추가(최대 5대 동시 미러링) · 해제는 연결 후 기기 목록에서">기기 추가</button>
     <button class="navbtn" id="setBtn" title="API / BLE 설정" data-i18n="nav.setup">SETUP</button>
     <button class="navbtn" id="langBtn" title="Language / 언어" aria-label="Language">EN</button>
   </div>
@@ -3176,7 +3175,7 @@ loadFeature(DEMO,false);renderLibrary();
 var I18N={
  ko:{
   'skip':'본문 바로가기 — 기능 생성',
-  'nav.build':'BUILD','nav.sim':'SIMULATOR','nav.console':'CONSOLE','nav.ble':'기기 추가','nav.bleMulti':'기기 여러 대 추가','nav.setup':'설정',
+  'nav.build':'BUILD','nav.sim':'SIMULATOR','nav.console':'CONSOLE','nav.ble':'기기 추가','nav.setup':'설정',
   'hero.eyebrow':'생각한 것을, 지금 바로.',
   'hero.sub':'원하는 기능을 입력하면, DotPad가 그 자리에서 보여줍니다. 기다림도, "검토해보겠습니다"도 없이.',
   'hero.cta1':'기능 생성하기','hero.cta2':'시뮬레이터 보기','hero.scroll':'스크롤 &darr;',
@@ -3231,7 +3230,7 @@ var I18N={
  },
  en:{
   'skip':'Skip to main — Feature Builder',
-  'nav.build':'BUILD','nav.sim':'SIMULATOR','nav.console':'CONSOLE','nav.ble':'Add device','nav.bleMulti':'Add devices','nav.setup':'SETUP',
+  'nav.build':'BUILD','nav.sim':'SIMULATOR','nav.console':'CONSOLE','nav.ble':'Add device','nav.setup':'SETUP',
   'hero.eyebrow':'What you imagine, right now.',
   'hero.sub':'Type the feature you want, and DotPad shows it on the spot. No waiting, no "we&rsquo;ll look into it."',
   'hero.cta1':'Build a feature','hero.cta2':'Open simulator','hero.scroll':'SCROLL &darr;',
@@ -3586,8 +3585,15 @@ var BLE={
   /* ---------- UI ---------- */
   refreshBtn:function(){
     var btn=document.getElementById('bleBtn');if(!btn)return;
-    if(BLE.connected){var n=(BLE.mode==='raw'?1:BLE.devs.length);btn.textContent='BLE · '+n+(LANG==='en'?'':'대')+(BLE.mode==='raw'?' raw':'');btn.className='navbtn on';}
-    else{btn.textContent=(typeof t==='function'?t('nav.ble'):'기기 추가');btn.className='navbtn';}
+    if(BLE.connected){
+      var n=(BLE.mode==='raw'?1:BLE.devs.length);
+      btn.textContent='BLE '+n+(LANG==='en'?'':'대')+(BLE.mode==='raw'?' raw':'')+tt(' · 추가',' · add');
+      btn.className='navbtn on';
+      btn.title=tt('기기 1대 더 추가 (최대 '+BLE.MAX+'대) · 해제는 우측 기기 목록에서','Add another device (max '+BLE.MAX+') · disconnect from the device list');
+    }else{
+      btn.textContent=(typeof t==='function'?t('nav.ble'):'기기 추가');btn.className='navbtn';
+      btn.title=tt('누를 때마다 기기 1대 추가(최대 '+BLE.MAX+'대 동시 미러링)','Adds one device per press (mirror up to '+BLE.MAX+')');
+    }
   },
   uiConnected:function(){
     BLE.refreshBtn();
@@ -3791,9 +3797,8 @@ var BLE={
   }
 };
 document.getElementById('bleBtn').addEventListener('click',function(){
-  BLE.connected?BLE.disconnect():BLE.addDevice();
+  BLE.addDevice();                       // 항상 "추가" — 해제는 기기 목록의 끊기/모두 끊기 (기기 여러 대 추가 버튼과 통합)
 });
-(function(){var mb=document.getElementById('bleMultiBtn');if(mb)mb.addEventListener('click',function(){BLE.addDevice();});})();
 
 /* ═══════════ DEPLOY EDITION: SYNC TEST PATTERN ═══════════
    시뮬레이터와 실기기가 1:1로 같아야 하는 검증 패턴.
