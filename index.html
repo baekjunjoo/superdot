@@ -470,7 +470,15 @@
 <script>
 /* ── 전역 설정 — LANG/SD는 스크립트 전 구간(데모 로드·부팅 안내 포함)에서 참조하므로 반드시 최상단 ──
    (과거엔 파일 후반 정의라 부팅 시점엔 undefined → bootStatus의 오프라인 안내가 TypeError로 조용히 누락됐음) */
-var LANG=(function(){try{return localStorage.getItem('sd_lang')||'ko';}catch(e){return 'ko';}})();
+var LANG=(function(){
+  try{
+    var saved=localStorage.getItem('sd_lang');
+    if(saved)return saved;
+    // 첫 방문: 브라우저 언어로 자동 선택 (해외 스크린리더 사용자가 한국어 페이지를 만나지 않도록)
+    var nl=(navigator.language||navigator.userLanguage||'').toLowerCase();
+    return nl.indexOf('ko')===0?'ko':'en';
+  }catch(e){return 'ko';}
+})();
 var SD={
   cfg:(function(){try{return JSON.parse(localStorage.getItem('sd_cfg')||'{}');}catch(e){return{};}})(),
   save:function(){try{localStorage.setItem('sd_cfg',JSON.stringify(SD.cfg));}catch(e){}},
@@ -2937,6 +2945,15 @@ function generate(){
     if(currentDP)currentDP.textLine(('build '+lm).slice(0,20));
     return;
   }
+  /* 숨은 안내 명령: 닷패드 연결 방법 — 비시각 사용자용 단계 안내 */
+  if(/연결 방법|연결방법|기기 연결|닷패드 연결|어떻게 연결|connect help|how to connect|pair(ing)? (the )?dot ?pad/i.test(req)){
+    var cSteps=LANG==='en'
+      ?'How to connect a Dot Pad: 1. Use Chrome or Edge — Safari and Firefox do not support Web Bluetooth. 2. Turn the Dot Pad on. 3. Press the "Add device" button at the top of this page — it is a button, reachable with Tab. 4. A browser Bluetooth list opens; choose the device named DotPad and press Pair. 5. You will hear "DotPad connected" when it is ready. Repeat to mirror up to five devices; disconnect from the device list that appears after connecting.'
+      :'닷패드 연결 방법: 1. 크롬 또는 엣지를 사용하세요 — 사파리·파이어폭스는 블루투스를 지원하지 않습니다. 2. 닷패드 전원을 켭니다. 3. 페이지 상단의 "기기 추가" 버튼을 누릅니다 — Tab 키로 이동할 수 있는 버튼입니다. 4. 브라우저 블루투스 목록이 열리면 DotPad로 시작하는 기기를 선택하고 페어링을 누릅니다. 5. 준비되면 "닷패드 연결 완료"라고 안내합니다. 같은 방법으로 최대 5대까지 미러링되고, 해제는 연결 후 나타나는 기기 목록에서 합니다.';
+    addMsg('ai','<span class="small">'+escapeHtml(cSteps)+'</span>');
+    tts(cSteps);
+    return;
+  }
   /* 숨은 점검 명령: 미매칭 로그 열람/복사/비우기 (키워드 사전 보강용 현장 데이터) */
   if(/^(미매칭|미스 로그|miss ?log|misses)\s*(목록|리스트|보여줘|list)?$/i.test(req)){
     var M0=[];try{M0=JSON.parse(localStorage.getItem('sd_miss')||'[]');}catch(e){}
@@ -3159,6 +3176,11 @@ loadFeature(DEMO,false);renderLibrary();
     if(!SD.cfg.mute)addMsg('ai','<span class="small">'+ (LANG==='en'
       ? 'Using a screen reader (e.g. NVDA)? Press the TTS ON button in the console to mute the built-in voice — all announcements are then read by your screen reader from the event console. To use the 1–4/arrow shortcuts, switch NVDA to focus mode (NVDA+Space); the F1–F4 and pan buttons also work with Tab+Enter.'
       : '스크린리더(NVDA 등)를 사용하시나요? 콘솔의 TTS ON 버튼을 눌러 자체 음성을 끄면 모든 안내가 이벤트 콘솔을 통해 스크린리더로만 읽혀 이중 발화가 없습니다. 숫자 1~4·화살표 단축키는 NVDA 포커스 모드(NVDA+Space)에서 동작하며, F1~F4·팬 버튼은 Tab+Enter로도 조작할 수 있습니다.')
+      +'</span>');
+    // 닷패드 연결 방법 — 비시각 사용자가 시작점을 찾지 못하는 문제 대응(외부 테스터 피드백)
+    addMsg('ai','<span class="small">'+ (LANG==='en'
+      ? 'To connect a Dot Pad: use Chrome or Edge, turn the Dot Pad on, press the "Add device" button at the top of the page, then pick your Dot Pad from the browser Bluetooth list. Type or say "how to connect" anytime to hear these steps again.'
+      : '닷패드 연결: 크롬 또는 엣지에서, 닷패드 전원을 켜고 페이지 상단의 "기기 추가" 버튼을 누른 뒤 브라우저 블루투스 목록에서 닷패드를 선택하세요. 언제든 "연결 방법"이라고 입력하면 이 안내를 다시 들을 수 있습니다.')
       +'</span>');
     var hasApi=!!(SD.cfg.api&&SD.cfg.api.trim());
     if(!hasApi){
