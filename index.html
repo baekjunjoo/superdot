@@ -599,7 +599,15 @@ function paint(){
     }
   }
 }
-function requestPaint(){if(!rafQueued){rafQueued=true;requestAnimationFrame(paint);}if(window.BLE&&BLE.connected)BLE.push(frameBuf);}
+var _bleFlushT=null;
+function requestPaint(){
+  if(!rafQueued){rafQueued=true;requestAnimationFrame(paint);}
+  // BLE 전송은 마이크로배치: drawBrailleBlock 등의 clear()→set()... 이 같은 턴에서 끝난 뒤 완성 프레임만 push.
+  // (과거엔 clear() 직후에도 즉시 push되어 "빈 프레임"이 실기기로 나가 전 핀이 내려갔다 올라오는 현상 발생)
+  if(window.BLE&&BLE.connected&&_bleFlushT==null){
+    _bleFlushT=setTimeout(function(){_bleFlushT=null;if(window.BLE&&BLE.connected)BLE.push(frameBuf);},0);
+  }
+}
 paint();
 
 /* BRAILLE */
