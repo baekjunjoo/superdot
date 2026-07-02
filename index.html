@@ -435,6 +435,7 @@
         <div style="display:flex;gap:6px">
           <select id="cfgVoice" style="flex:1"><option value="" data-i18n="setup.voiceAuto">자동 — 기기 내 최고 품질 선택 (권장)</option></select>
           <button class="btn" id="voiceTest" type="button" data-i18n="setup.voiceTest">듣기</button>
+          <button class="btn" id="voiceTestMic" type="button" data-i18n="setup.voiceTestMic" title="마이크 사용 중 음량으로 재생 — '듣기'와 같은 크기로 들리면 이 기기가 볼륨 지시를 무시하는 것">마이크 중</button>
         </div>
         <div class="frow" style="margin-top:10px">
           <div>
@@ -3222,9 +3223,9 @@ var I18N={
   'setup.brlLabel':'점역 테스트 — 내장 vs Liblouis · 역점역','setup.brlGo':'변환',
   'setup.minLabel':'회의록 저장 형식 — Minutes file format','setup.minEbrl':'eBraille (.ebrl) — 기본','setup.minTxt':'텍스트 (.txt)','setup.minMd':'마크다운 (.md)',
   'setup.minNote':'회의록 기능에서 F1으로 저장할 때 이 형식으로 내보냅니다.',
-  'setup.voiceLabel':'TTS Voice — 음성 안내 목소리','setup.voiceAuto':'자동 — 기기 내 최고 품질 선택 (권장)','setup.voiceTest':'듣기',
+  'setup.voiceLabel':'TTS Voice — 음성 안내 목소리','setup.voiceAuto':'자동 — 기기 내 최고 품질 선택 (권장)','setup.voiceTest':'듣기','setup.voiceTestMic':'마이크 중',
   'setup.volLabel':'기본 음량','setup.volMicLabel':'마이크 사용 중 음량','setup.rateLabel':'말하기 속도',
-  'setup.voiceNote':'기기에 설치된 음성 목록입니다. Windows에서는 Edge 브라우저가 신경망 음성(Natural)을 제공해 가장 자연스럽습니다.',
+  'setup.voiceNote':'기기에 설치된 음성 목록입니다. Windows에서는 Edge 브라우저가 신경망 음성(Natural)을 제공해 가장 자연스럽습니다. 블루투스 이어폰은 마이크 기능(자막·회의록·메모)에서 통화 모드로 전환되어 소리가 갑자기 크게/다르게 들릴 수 있습니다 — 그 경우 "마이크 사용 중 음량"을 낮추거나 유선·내장 스피커를 사용하세요.',
   'setup.sdkNote':'BLE는 저장소에 <span style="color:var(--ink-soft)">DotPadSDK-3.0.0.js</span>가 있으면 공식 SDK로 연결됩니다(스캔·패킷·ACK·하드웨어 키 자동 처리). 위 UUID/인코딩/쓰기 설정은 SDK 파일이 없을 때의 raw 폴백 전용입니다.',
   'setup.cancel':'취소','setup.save':'저장'
  },
@@ -3277,9 +3278,9 @@ var I18N={
   'setup.brlLabel':'Braille test — built-in vs Liblouis · back-translation','setup.brlGo':'Convert',
   'setup.minLabel':'Minutes file format','setup.minEbrl':'eBraille (.ebrl) — default','setup.minTxt':'Text (.txt)','setup.minMd':'Markdown (.md)',
   'setup.minNote':'Used when saving minutes with F1.',
-  'setup.voiceLabel':'TTS voice','setup.voiceAuto':'Auto — best voice on this device (recommended)','setup.voiceTest':'Play',
+  'setup.voiceLabel':'TTS voice','setup.voiceAuto':'Auto — best voice on this device (recommended)','setup.voiceTest':'Play','setup.voiceTestMic':'Mic-active',
   'setup.volLabel':'Base volume','setup.volMicLabel':'Volume while mic is on','setup.rateLabel':'Speech rate',
-  'setup.voiceNote':'Voices installed on this device. On Windows, the Edge browser provides the most natural (Neural) voices.',
+  'setup.voiceNote':'Voices installed on this device. On Windows, the Edge browser provides the most natural (Neural) voices. Bluetooth headsets switch to call mode when the mic opens (caption/minutes/memo), which can suddenly sound louder/different — lower "Volume while mic is on" or use wired/built-in speakers.',
   'setup.sdkNote':'BLE connects via the official SDK when <span style="color:var(--ink-soft)">DotPadSDK-3.0.0.js</span> is present in the repo (scan/packets/ACK/hardware keys handled automatically). The UUID/encoding/write settings above apply only to the raw fallback when the SDK file is missing.',
   'setup.cancel':'Cancel','setup.save':'Save'
  }
@@ -3337,6 +3338,15 @@ else initLang();
     var prev=SD.cfg.voice;SD.cfg.voice=fVoice.value;TTSV.locked=false;TTSV.byLang={};refreshVoices();
     tts(tt('안녕하세요. 닷패드 음성 안내 테스트입니다.','Hello. This is the DotPad voice guidance test.'));
     SD.cfg.voice=prev;TTSV.locked=false;TTSV.byLang={};refreshVoices();
+  });
+  var vtm=document.getElementById('voiceTestMic');
+  if(vtm)vtm.addEventListener('click',function(){    // 마이크 사용 중 음량으로 미리듣기 (볼륨 지시 무시 기기 진단용)
+    var prev=SD.cfg.voice,pm=SD.cfg.volMic;SD.cfg.voice=fVoice.value;SD.cfg.volMic=parseInt(fVolMic.value,10);
+    TTSV.locked=false;TTSV.byLang={};refreshVoices();
+    micActive(true);
+    tts(tt('마이크 사용 중 크기입니다. 방금 듣기보다 작게 들려야 정상입니다.','This is the mic-active volume. It should sound quieter than the previous test.'));
+    setTimeout(function(){micActive(false);},4000);
+    SD.cfg.voice=prev;SD.cfg.volMic=pm;TTSV.locked=false;TTSV.byLang={};refreshVoices();
   });
   function llStatText(){
     if(LL.status==='ready')return tt('Liblouis: 사용 중 (v'+LL.ver+') · 실패 단어는 내장 변환기로 자동 폴백','Liblouis: active (v'+LL.ver+') · failed words fall back to built-in');
