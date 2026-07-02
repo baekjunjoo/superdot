@@ -229,7 +229,7 @@
     <span class="live" id="modeBadge">SIMULATOR</span>
     <button class="navbtn" id="bleBtn" data-i18n="nav.ble" title="누를 때마다 기기 1대 추가(최대 5대 동시 미러링) · 해제는 연결 후 기기 목록에서">기기 추가</button>
     <button class="navbtn" id="setBtn" title="API / BLE 설정" data-i18n="nav.setup">SETUP</button>
-    <button class="navbtn" id="langBtn" title="Language / 언어" aria-label="Language">EN</button>
+    <button class="navbtn" id="langBtn" title="Language / 언어" aria-label="언어 전환 — 한국어/영어" data-i18n-aria="nav.langAria">EN</button>
   </div>
 </nav>
 
@@ -275,11 +275,11 @@
           <div class="msg ai"><span class="ftitle">SUPER DOT</span><br><span data-i18n="build.greet">원하는 기능을 입력하면 DotPad에서 바로 작동하는 기능을 생성합니다.</span><div class="small" data-i18n="build.greetEx">예: "이번 분기 매출을 막대그래프로" &middot; "주사위 굴리기" &middot; "현재 시각을 점자로" &middot; "간단한 미로 게임"</div></div>
         </div>
         <div class="inputArea">
-          <textarea id="input" aria-label="기능 요청 입력" data-i18n-ph="build.ph" placeholder="고객이 원하는 기능을 자연어로 입력...  (생성 후 같은 칸에서 수정 요청 가능: '막대를 더 두껍게')"></textarea>
+          <textarea id="input" aria-label="기능 요청 입력 — 컨트롤 엔터 또는 기능 생성 버튼으로 실행" data-i18n-aria="build.inputAria" data-i18n-ph="build.ph" placeholder="고객이 원하는 기능을 자연어로 입력...  (생성 후 같은 칸에서 수정 요청 가능: '막대를 더 두껍게')"></textarea>
           <div class="row">
             <button class="btn solid actbtn" id="genBtn" data-i18n="build.gen">기능 생성</button>
             <button class="btn actbtn" id="newBtn" title="현재 기능 맥락 초기화" data-i18n="build.new">새 맥락</button>
-            <button class="btn actbtn" id="micBtn" title="음성으로 입력 (ko-KR)">MIC</button>
+            <button class="btn actbtn" id="micBtn" title="음성으로 입력" aria-label="음성으로 요청 입력 — 말한 내용이 입력창에 들어갑니다" data-i18n-aria="build.micAria">MIC</button>
           </div>
           <div class="hint hint-below">&#8984;/CTRL+ENTER</div>
           <div class="chips" id="chips">
@@ -299,7 +299,7 @@
         </div>
       </div>
       <div class="block">
-        <div class="block-head"><span data-i18n="lib.title">FEATURE LIBRARY</span><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="openBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.open">파일 열기</button><button class="btn" id="shareBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.share">SHARE LINK</button><button class="btn" id="importBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.import">IMPORT</button><button class="btn" id="exportBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.export">EXPORT</button></span></div>
+        <div class="block-head"><span data-i18n="lib.title">FEATURE LIBRARY</span><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="openBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.open" aria-label="파일 열기 — .ebrl, .txt, .csv 지원. CSV는 단어장·퀴즈·시간표·목록 자동 판별" data-i18n-aria="lib.openAria">파일 열기</button><button class="btn" id="shareBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.share">SHARE LINK</button><button class="btn" id="importBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.import">IMPORT</button><button class="btn" id="exportBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.export">EXPORT</button></span></div>
         <input type="file" id="openFile" accept=".ebrl,.txt,.csv" style="display:none" aria-hidden="true" tabindex="-1">
         <div id="library"><div class="empty" data-i18n="lib.empty">데모 기능이 시뮬레이터에 로드됨</div></div>
       </div>
@@ -1108,15 +1108,15 @@ function createDP(){
         try{
           if(fin)dp._listenFn(fin,true);
           dp._listenFn(tmp,false);
-        }catch(err){logErr('listen 콜백 오류: '+err.message);}
+        }catch(err){logErr(tt('listen 콜백 오류: ','listen callback error: ')+err.message);}
       };
       recog.onerror=function(e){
-        if(e.error==='not-allowed')logErr('마이크 권한이 거부되었습니다');
+        if(e.error==='not-allowed')logErr(tt('마이크 권한이 거부되었습니다. 주소창의 자물쇠 아이콘에서 마이크를 허용한 뒤 새로고침하세요.','Microphone access denied. Allow the microphone from the padlock icon in the address bar, then reload.'));
       };
       recog.onend=function(){
         if(!dead&&recog){try{recog.start();}catch(e){}}   // 연속 모드 자동 재시작
       };
-      try{recog.start();micActive(true);logRow('<span class="key">[MIC] 연속 음성 인식 시작 ('+recog.lang+')</span>');}catch(e){logErr('음성 인식 시작 실패: '+e.message);return false;}   // 마이크 보정을 즉시 적용(인트로 음성이 onstart 전에 재생돼 100%로 크게 나가던 문제 수정)
+      try{recog.start();micActive(true);logRow('<span class="key">[MIC] '+tt('연속 음성 인식 시작','Continuous recognition started')+' ('+recog.lang+')</span>');}catch(e){logErr(tt('음성 인식 시작 실패: ','Speech recognition failed to start: ')+e.message);return false;}   // 마이크 보정을 즉시 적용(인트로 음성이 onstart 전에 재생돼 100%로 크게 나가던 문제 수정)
       return true;
     },
     setListenLang:function(code){                           // 인식 언어 전환(ko|en|ja) — 같은 콜백 유지하며 재시작
@@ -1134,23 +1134,23 @@ function createDP(){
         (function cycle(){
           if(dead||!dp._nim||!dp._nim.on)return;
           var mt=(typeof MediaRecorder!=='undefined'&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported('audio/webm'))?'audio/webm':'';
-          var rec;try{rec=mt?new MediaRecorder(stream,{mimeType:mt}):new MediaRecorder(stream);}catch(e){logErr('녹음 시작 실패: '+e.message);return;}
+          var rec;try{rec=mt?new MediaRecorder(stream,{mimeType:mt}):new MediaRecorder(stream);}catch(e){logErr(tt('녹음 시작 실패: ','Recording failed to start: ')+e.message);return;}
           dp._nim.rec=rec;var chunks=[];
           rec.ondataavailable=function(ev){if(ev.data&&ev.data.size)chunks.push(ev.data);};
           rec.onstop=function(){
             if(chunks.length)onSegment(new Blob(chunks,{type:rec.mimeType||'audio/webm'}));
             if(!dead&&dp._nim&&dp._nim.on)dp._nim.timer=setTimeout(cycle,10);
           };
-          try{rec.start();}catch(e){logErr('녹음 시작 실패: '+e.message);return;}
+          try{rec.start();}catch(e){logErr(tt('녹음 시작 실패: ','Recording failed to start: ')+e.message);return;}
           dp._nim.timer=setTimeout(function(){try{if(rec.state!=='inactive')rec.stop();}catch(e){}},4000);
         })();
-      }).catch(function(e){logErr('마이크 접근 실패: '+e.message+' — 브라우저 인식으로 전환');dp._nim=null;dp._startRecog();});
+      }).catch(function(e){logErr(tt('마이크 접근 실패: ','Microphone access failed: ')+e.message+tt(' — 브라우저 인식으로 전환. 주소창 자물쇠에서 마이크 허용을 확인하세요.',' — falling back to browser recognition. Check mic permission via the address-bar padlock.'));dp._nim=null;dp._startRecog();});
     },
     _startNimAsr:function(){                                 // NVIDIA NIM ASR — 공용 캡처 → 프록시 POST 전사(자동 언어감지)
       if(dead||!dp._listenFn)return false;
-      if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==='undefined'){logErr('이 브라우저는 녹음을 지원하지 않아 브라우저 인식으로 전환합니다.');return false;}
+      if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==='undefined'){logErr(tt('이 브라우저는 녹음을 지원하지 않아 브라우저 인식으로 전환합니다.','This browser does not support recording — falling back to browser recognition.'));return false;}
       if(!nimBase())return false;
-      logRow('<span class="key">[MIC] NVIDIA ASR 시작 · 자동 언어감지</span>');
+      logRow('<span class="key">[MIC] '+tt('NVIDIA ASR 시작 · 자동 언어감지','NVIDIA ASR started · auto language detection')+'</span>');
       dp._capture(dp._nimSend,false);
       return true;
     },
@@ -1159,22 +1159,22 @@ function createDP(){
       var fd=new FormData();fd.append('audio',blob,'chunk.webm');fd.append('language',(SD.cfg.asrLang||'auto'));fd.append('denoise',(SD.cfg.asrDenoise?'true':'false'));
       fetch(base+'/asr',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(j){
         if(dead)return;var txt=((j&&(j.text||j.transcript||j.result))||'').trim();
-        if(txt){try{dp._listenFn(txt,true);}catch(e){logErr('ASR 콜백 오류: '+e.message);}}
-      }).catch(function(e){if(!dp._nimWarned){dp._nimWarned=true;logErr('NVIDIA ASR 요청 실패: '+e.message);}});
+        if(txt){try{dp._listenFn(txt,true);}catch(e){logErr(tt('ASR 콜백 오류: ','ASR callback error: ')+e.message);}}
+      }).catch(function(e){if(!dp._nimWarned){dp._nimWarned=true;logErr(tt('NVIDIA ASR 요청 실패: ','NVIDIA ASR request failed: ')+e.message);}});
     },
     _stopNim:function(){
       if(dp._nim){dp._nim.on=false;try{if(dp._nim.timer)clearTimeout(dp._nim.timer);}catch(e){}try{if(dp._nim.rec&&dp._nim.rec.state!=='inactive')dp._nim.rec.stop();}catch(e){}try{dp._nim.stream.getTracks().forEach(function(t){t.stop();});}catch(e){}dp._nim=null;}
     },
     _startWhisper:function(){                                // 온디바이스 Whisper(WASM/WebGPU) — 모델 로드 후 공용 캡처 → 로컬 전사
       if(dead||!dp._listenFn)return false;
-      if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==='undefined'){logErr('녹음 미지원 — 브라우저 인식으로 전환');return false;}
+      if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==='undefined'){logErr(tt('녹음 미지원 — 브라우저 인식으로 전환','Recording unsupported — falling back to browser recognition'));return false;}
       micActive(true);
-      logRow('<span class="key">[MIC] 온디바이스 Whisper 로딩… (최초 1회 모델 다운로드)</span>');
+      logRow('<span class="key">[MIC] '+tt('온디바이스 Whisper 로딩… (최초 1회 모델 다운로드)','Loading on-device Whisper… (one-time model download)')+'</span>');
       whisperLoad().then(function(pipe){
         if(dead)return;dp._wpipe=pipe;
-        logRow('<span class="key">[MIC] Whisper 준비됨 · 오프라인 자동 언어감지</span>');
+        logRow('<span class="key">[MIC] '+tt('Whisper 준비됨 · 오프라인 자동 언어감지','Whisper ready · offline auto language detection')+'</span>');
         dp._capture(dp._whisperTranscribe,true);
-      }).catch(function(e){logErr('Whisper 로드 실패: '+e.message+' — 브라우저 인식으로 전환');dp._startRecog();});
+      }).catch(function(e){logErr(tt('Whisper 로드 실패: ','Whisper failed to load: ')+e.message+tt(' — 브라우저 인식으로 전환',' — falling back to browser recognition'));dp._startRecog();});
       return true;
     },
     _whisperTranscribe:function(blob){
@@ -1184,8 +1184,8 @@ function createDP(){
         return dp._wpipe(pcm,{task:'transcribe',chunk_length_s:30});
       }).then(function(out){
         if(dead||!out)return;var txt=((out.text)||'').trim();
-        if(txt&&!/^\s*[\[(][^\])]*[\])]\s*$/.test(txt)){try{dp._listenFn(txt,true);}catch(e){logErr('Whisper 콜백 오류: '+e.message);}}   // [BLANK_AUDIO] 등 잡음 토큰 제외
-      }).catch(function(e){if(!dp._wWarned){dp._wWarned=true;logErr('Whisper 전사 오류: '+e.message);}});
+        if(txt&&!/^\s*[\[(][^\])]*[\])]\s*$/.test(txt)){try{dp._listenFn(txt,true);}catch(e){logErr(tt('Whisper 콜백 오류: ','Whisper callback error: ')+e.message);}}   // [BLANK_AUDIO] 등 잡음 토큰 제외
+      }).catch(function(e){if(!dp._wWarned){dp._wWarned=true;logErr(tt('Whisper 전사 오류: ','Whisper transcription error: ')+e.message);}});
     },
     _wDecode:function(blob){                                 // webm/opus → 16kHz mono Float32 (Whisper 입력)
       return blob.arrayBuffer().then(function(ab){
@@ -1206,7 +1206,7 @@ function createDP(){
     onKey:function(fn){keyHandler=fn;},
     interval:function(ms,fn){var id=setInterval(function(){if(!dead)fn();},ms);timers.push(id);return id;},
     timeout:function(ms,fn){var id=setTimeout(function(){if(!dead)fn();},ms);timers.push(id);return id;},
-    _fireKey:function(k){if(keyHandler&&!dead){try{keyHandler(k);}catch(e){logErr('키 핸들러 오류: '+e.message);}}},
+    _fireKey:function(k){if(keyHandler&&!dead){try{keyHandler(k);}catch(e){logErr(tt('키 핸들러 오류: ','Key handler error: ')+e.message);}}},
     _destroy:function(){dead=true;try{dp._stopNim();}catch(e){}if(recog){var r=recog;recog=null;try{r.onend=null;r.stop();}catch(e){}}micActive(false);timers.forEach(function(id){clearInterval(id);clearTimeout(id);});keyHandler=null;}
   };
   return dp;
@@ -2519,7 +2519,7 @@ catalog:{
    if(say!==false)dp.speak(dp.L((dp.state.i+1)+'번, '+c[1]+'.', 'Number '+(dp.state.i+1)+', '+c[2]+'.'));
   }
   show(false);
-  dp.speak(dp.L('기능 카탈로그. 내장 기능 '+C.length+'개. 팬 키로 탐색하고, 에프1은 바로 실행, 에프2는 요청 예시입니다.', 'Feature catalog. '+C.length+' built-in features. Pan to browse, F1 runs it, F2 gives an example request.'));
+  dp.speak(dp.L('기능 카탈로그. 내장 기능 '+C.length+'개. 팬 키로 탐색하고, 에프1은 바로 실행, 에프2는 요청 예시입니다. 연결 방법이나 버전 같은 숨은 명령은 \"명령어\"라고 말하면 들려드려요.', 'Feature catalog. '+C.length+' built-in features. Pan to browse, F1 runs it, F2 gives an example request. Say \"commands\" to hear hidden commands like how-to-connect and version.'));
   dp.onKey(function(k){
    var c=cur();
    if(k==='PAN_RIGHT'){dp.state.i=(dp.state.i+1)%C.length;show();}
@@ -2628,7 +2628,7 @@ function loadFeature(feature,speakIntro){
       tts(tt(disp+' 기능이 준비됐습니다.'+(guide?' '+guide+'.':''), disp+' is ready.'+(guide?' '+guide+'.':'')));
     }
     renderLibrary();return true;
-  }catch(e){logErr('기능 실행 오류: '+e.message);return false;}
+  }catch(e){logErr(tt('기능 실행 오류: ','Feature runtime error: ')+e.message);return false;}
 }
 
 /* KEYS */
@@ -2945,6 +2945,15 @@ function generate(){
     if(currentDP)currentDP.textLine(('build '+lm).slice(0,20));
     return;
   }
+  /* 숨은 안내 명령: 명령어 목록 — 숨은 명령들의 발견성 */
+  if(/^(명령어|숨은 명령|음성 명령|commands?|voice commands?)\s*(목록|리스트|보여줘|list)?$/i.test(req)){
+    var cmds=LANG==='en'
+      ?'Available commands — say or type: "feature list" (browse all features, F1 runs one) · "how to connect" (Dot Pad pairing steps) · "version" (build date) · "miss log" (requests that failed matching, auto-copied) · "miss log clear". File open supports .ebrl, .txt, and .csv — CSV: "word,meaning"=word list, "question,answer,wrong…"=quiz, weekday header=timetable, one column=list.'
+      :'사용할 수 있는 명령 — 입력하거나 말하세요: "기능 목록"(전체 기능 탐색, F1 실행) · "연결 방법"(닷패드 페어링 단계) · "버전"(빌드 확인) · "미매칭 목록"(매칭 실패 요청, 자동 복사) · "미매칭 삭제". 파일 열기는 .ebrl·.txt·.csv 지원 — CSV는 "단어,뜻"=단어장, "질문,정답,오답…"=퀴즈, 요일 헤더=시간표, 1열=목록.';
+    addMsg('ai','<span class="small">'+escapeHtml(cmds)+'</span>');
+    tts(cmds);
+    return;
+  }
   /* 숨은 안내 명령: 닷패드 연결 방법 — 비시각 사용자용 단계 안내 */
   if(/연결 방법|연결방법|기기 연결|닷패드 연결|어떻게 연결|connect help|how to connect|pair(ing)? (the )?dot ?pad/i.test(req)){
     var cSteps=LANG==='en'
@@ -3248,7 +3257,8 @@ var I18N={
   'setup.volLabel':'기본 음량','setup.volMicLabel':'마이크 사용 중 음량','setup.rateLabel':'말하기 속도',
   'setup.voiceNote':'기기에 설치된 음성 목록입니다. Windows에서는 Edge 브라우저가 신경망 음성(Natural)을 제공해 가장 자연스럽습니다. 블루투스 이어폰은 마이크 기능(자막·회의록·메모)에서 통화 모드로 전환되어 소리가 갑자기 크게/다르게 들릴 수 있습니다 — 그 경우 "마이크 사용 중 음량"을 낮추거나 유선·내장 스피커를 사용하세요.',
   'setup.sdkNote':'BLE는 저장소에 <span style="color:var(--ink-soft)">DotPadSDK-3.0.0.js</span>가 있으면 공식 SDK로 연결됩니다(스캔·패킷·ACK·하드웨어 키 자동 처리). 위 UUID/인코딩/쓰기 설정은 SDK 파일이 없을 때의 raw 폴백 전용입니다.',
-  'setup.cancel':'취소','setup.save':'저장'
+  'setup.cancel':'취소','setup.save':'저장',
+  'build.inputAria':'기능 요청 입력 — 컨트롤 엔터 또는 기능 생성 버튼으로 실행','build.micAria':'음성으로 요청 입력 — 말한 내용이 입력창에 들어갑니다','nav.langAria':'언어 전환 — 한국어/영어','lib.openAria':'파일 열기 — .ebrl, .txt, .csv 지원. CSV는 단어장·퀴즈·시간표·목록 자동 판별'
  },
  en:{
   'skip':'Skip to main — Feature Builder',
@@ -3303,7 +3313,8 @@ var I18N={
   'setup.volLabel':'Base volume','setup.volMicLabel':'Volume while mic is on','setup.rateLabel':'Speech rate',
   'setup.voiceNote':'Voices installed on this device. On Windows, the Edge browser provides the most natural (Neural) voices. Bluetooth headsets switch to call mode when the mic opens (caption/minutes/memo), which can suddenly sound louder/different — lower "Volume while mic is on" or use wired/built-in speakers.',
   'setup.sdkNote':'BLE connects via the official SDK when <span style="color:var(--ink-soft)">DotPadSDK-3.0.0.js</span> is present in the repo (scan/packets/ACK/hardware keys handled automatically). The UUID/encoding/write settings above apply only to the raw fallback when the SDK file is missing.',
-  'setup.cancel':'Cancel','setup.save':'Save'
+  'setup.cancel':'Cancel','setup.save':'Save',
+  'build.inputAria':'Feature request input — press Control+Enter or the Generate button to run','build.micAria':'Dictate a request — your speech goes into the input box','nav.langAria':'Switch language — Korean/English','lib.openAria':'Open file — supports .ebrl, .txt, .csv. CSV auto-detects word list, quiz, timetable or list'
  }
 };
 /* LANG은 스크립트 최상단에서 정의됨 */
@@ -3830,7 +3841,7 @@ document.getElementById('bleBtn').addEventListener('click',function(){
    · 패턴이 한 칸씩 밀림 → 셀 정렬(시작 인덱스) 문제                       */
 var SYNC={
   id:-1,name:'SYNC TEST',description:'시뮬레이터-실기기 정렬 검증 패턴',request:'(진단)',
-  tts_intro:'싱크 테스트 패턴입니다. 테두리 사각형, 좌상단에서 우하단으로 향하는 대각선, 좌상단 엘 마커, 중앙 원, 우상단 사각 점, 그리고 텍스트 라인의 싱크 문구가 기기와 화면에서 동일해야 합니다.',
+  tts_intro:{ko:'싱크 테스트 패턴입니다. 테두리 사각형, 좌상단에서 우하단으로 향하는 대각선, 좌상단 엘 마커, 중앙 원, 우상단 사각 점, 그리고 텍스트 라인의 싱크 문구가 기기와 화면에서 동일해야 합니다.',en:'Sync test pattern. The border rectangle, the diagonal from top-left to bottom-right, the L marker at top-left, the center circle, the square dot at top-right, and the sync text line must look identical on the device and on screen.'},
   code:[
 "dp.clear();",
 "dp.rect(0,0,60,40);",
@@ -3850,7 +3861,7 @@ document.getElementById('syncBtn').addEventListener('click',function(){
   var micBtn=document.getElementById('micBtn');
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){
-    micBtn.addEventListener('click',function(){logErr('이 브라우저는 음성 인식을 지원하지 않습니다. Chrome에서 열어주세요.');});
+    micBtn.addEventListener('click',function(){logErr(tt('이 브라우저는 음성 인식을 지원하지 않습니다. Chrome에서 열어주세요.','Speech recognition is not supported in this browser. Please use Chrome.'));});
     return;
   }
   var rec=null,listening=false;
@@ -3860,7 +3871,7 @@ document.getElementById('syncBtn').addEventListener('click',function(){
     if(listening){try{rec.stop();}catch(e){}return;}
     // 라이브 자막 등 기능의 연속 인식과 동시 실행 불가 — 기능 쪽을 먼저 중지
     if(window.currentDP&&currentDP.stopListen){
-      try{currentDP.stopListen();logRow('<span class="key">[MIC] 기능의 음성 인식을 중지하고 받아쓰기를 시작합니다</span>');}catch(e){}
+      try{currentDP.stopListen();logRow('<span class="key">[MIC] '+tt('기능의 음성 인식을 중지하고 받아쓰기를 시작합니다','Stopping the feature mic and starting dictation')+'</span>');}catch(e){}
     }
     rec=new SR();rec.lang=(LANG==='en'?'en-US':'ko-KR');rec.interimResults=false;rec.maxAlternatives=1;
     rec.onstart=function(){listening=true;micActive(true);micBtn.textContent='REC \u25CF';micBtn.classList.add('rec');micBtn.setAttribute('aria-pressed','true');};
@@ -3870,9 +3881,9 @@ document.getElementById('syncBtn').addEventListener('click',function(){
       input.value=(input.value?input.value+' ':'')+t;
       input.focus();
     };
-    rec.onerror=function(e){logErr('음성 인식 오류: '+e.error);};
+    rec.onerror=function(e){logErr(tt('음성 인식 오류: ','Speech recognition error: ')+e.error+(e.error==='not-allowed'?tt(' — 주소창 자물쇠에서 마이크를 허용하세요.',' — allow the microphone via the address-bar padlock.'):''));};
     rec.onend=function(){listening=false;micActive(false);micBtn.textContent='MIC';micBtn.classList.remove('rec');micBtn.setAttribute('aria-pressed','false');};
-    try{rec.start();}catch(e){logErr('음성 인식 시작 실패: '+e.message);}
+    try{rec.start();}catch(e){logErr(tt('음성 인식 시작 실패: ','Dictation failed to start: ')+e.message);}
   });
 })();
 

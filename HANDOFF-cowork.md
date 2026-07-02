@@ -84,6 +84,7 @@ node --check /tmp/app.js
 - 검증: 기존 매처 40발화 스냅샷 전후 동일, 신규 매칭 12발화 확인, mock 스모크(템플릿 27종·ebrl 왕복·교실 라우팅) 통과.
 - **NVDA 대응**: SETUP 12필드 label-for 연결, ttsBtn aria-pressed, 부팅 시 스크린리더 안내 1줄(TTS OFF 시 콘솔 라이브 리전으로만 낭독).
 - **비시각 사용성(워크스루 기반)**: ①로드 후 무음 감지 — `tts._n` 카운터로 loadFeature가 "런타임이 아무 말도 안 한 로드"(구형 템플릿 T2/RUN/카탈로그)를 감지해 `CATALOG_LIST` 표시명+`keymapGuide()`(KEYMAP→음성 키 안내)를 자동 발화. 인트로 있는 기능·speakIntro=false 부팅 로드는 미발화. ②minutes 복구를 자체 TTS로도 안내(700ms 지연), F4 삭제는 4초 내 2회 확인. ③quiz 피드백 중 입력에 "잠시만요" 응답.
+- **발견성·언어 고정 전수 수정(외부 피드백 후속)**: ①마이크 권한 거부·음성인식 오류에 복구 방법(주소창 자물쇠) 포함 + 마이크/녹음/Whisper/NVIDIA 관련 사용자 대면 문자열 23곳 tt() 이중언어화 ②SYNC TEST 인트로 {ko,en} ③"명령어/commands" 명령 신설(숨은 명령·파일 형식 안내) + catalog 인트로에서 언급 ④textarea(제출 방법)·MIC 버튼·언어 버튼·파일 열기 버튼 aria를 data-i18n-aria로 구체화.
 - **외부 테스터 피드백 대응(연결 발견성)**: "Unclear how to connect Dot Pad" — ①첫 방문 시 navigator.language로 ko/en 자동 선택(sd_lang 없을 때만) ②부팅 채팅에 연결 4단계 안내 1줄 ③"연결 방법"/"how to connect" 음성 명령(단계 안내 음성+텍스트).
 - **BLE 버튼 통합**: "기기 여러 대 추가" 버튼 제거 — "기기 추가" 하나가 항상 추가 동작(최대 5대, 연결 중 라벨 "BLE n대 · 추가"), **해제는 기기 목록의 끊기/모두 끊기로만**(navbtn 전체 해제 동작 제거 — 실수 방지).
 - **TTS 음량 계측**: 마이크 기능(자막/회의록/메모)의 utterance.volume은 설계대로 0.5(볼륨 지시), 일반 기능 1.0, 종료 후 복귀 정상 — "마이크 기능에서 더 크게 들림"은 기기 오디오 경로(블루투스 HFP 전환·Windows 통신 덕킹·volume 지시 무시 보이스)가 원인. SETUP에 "마이크 중" 미리듣기 버튼(진단용)과 블루투스 안내문 추가.
