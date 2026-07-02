@@ -1684,13 +1684,35 @@ rps:{
    dp.speak(dp.L('컴퓨터는 '+names[cpu]+'. '+(r===0?'무승부':(r===1?'당신의 승리':'당신의 패배')), 'Computer chose '+names[cpu]+'. '+(r===0?'Draw':(r===1?'You win':'You lose'))));});
  }},
 maze:{
- schema:'step:이동 칸수 1~4(기본 2)',
+ schema:'step:이동 칸수 1~4(기본 2) — 매번 다른 랜덤 미로. F1 위, F4 아래, 팬 좌우, F2 새 미로',
  defaults:{step:2},
  run:function(dp,p){
   var st=Math.max(1,Math.min(4,(p.step|0)||2));
-  var walls=[[0,0,60,2],[0,38,52,2],[0,0,2,40],[58,0,2,30],
-   [10,2,2,26],[18,12,2,28],[28,2,2,26],[38,12,2,28],[48,2,2,20]];
-  dp.state.x=4;dp.state.y=4;dp.state.px=-1;dp.state.py=-1;
+  var COLS=7,ROWS=4,x0=2,y0=2,cw=8,ch=9;             // 셀 격자 — 통로 폭 6~7픽셀(2×2 플레이어·step2 이동 가능)
+  var walls=[];
+  function genMaze(){                                 // 재귀 백트래커 — 모든 셀 연결 보장(항상 풀 수 있음)
+   var R=[],B=[],vis=[];
+   for(var i=0;i<COLS*ROWS;i++){R.push(true);B.push(true);vis.push(false);}
+   var stack=[0];vis[0]=true;
+   while(stack.length){
+    var cur=stack[stack.length-1],c=cur%COLS,r=(cur/COLS)|0,nb=[];
+    if(c>0&&!vis[cur-1])nb.push([cur-1,'L']);
+    if(c<COLS-1&&!vis[cur+1])nb.push([cur+1,'R']);
+    if(r>0&&!vis[cur-COLS])nb.push([cur-COLS,'U']);
+    if(r<ROWS-1&&!vis[cur+COLS])nb.push([cur+COLS,'D']);
+    if(!nb.length){stack.pop();continue;}
+    var pick=nb[Math.floor(Math.random()*nb.length)],nxt=pick[0],dir=pick[1];
+    if(dir==='R')R[cur]=false;else if(dir==='L')R[nxt]=false;
+    else if(dir==='D')B[cur]=false;else B[nxt]=false;
+    vis[nxt]=true;stack.push(nxt);
+   }
+   walls=[[0,0,60,2],[0,38,52,2],[0,0,2,40],[58,0,2,30]];   // 테두리 — 우하단 출구 개방(기존과 동일)
+   for(var rr=0;rr<ROWS;rr++)for(var cc=0;cc<COLS;cc++){
+    var idx=rr*COLS+cc;
+    if(cc<COLS-1&&R[idx])walls.push([x0+(cc+1)*cw-1,y0+rr*ch,2,ch+1]);
+    if(rr<ROWS-1&&B[idx])walls.push([x0+cc*cw,y0+(rr+1)*ch-1,cw+1,2]);
+   }
+  }
   function drawWalls(){dp.clear();walls.forEach(function(w){dp.rect(w[0],w[1],w[2],w[3],{fill:true});});}
   function onWall(x,y){for(var i=0;i<walls.length;i++){var w=walls[i];if(x>=w[0]&&x<w[0]+w[2]&&y>=w[1]&&y<w[1]+w[3])return true;}return false;}
   function moveCursor(){                            // 이전 플레이어 자리만 지우고(벽이면 복원) 새 자리만 칠함 → 변경 행 1~2개
@@ -1700,11 +1722,19 @@ maze:{
   }
   function hit(x,y){if(x<2||y<2||x>57||y>37)return!(x>=52&&y>=33);
    for(var i=0;i<walls.length;i++){var w=walls[i];if(x+1>=w[0]&&x<w[0]+w[2]&&y+1>=w[1]&&y<w[1]+w[3])return true;}return false;}
-  drawWalls();moveCursor();dp.textLine('maze: find exit');
-  dp.onKey(function(k){var dx=0,dy=0;
+  function reset(say){
+   genMaze();dp.state.x=4;dp.state.y=4;dp.state.px=-1;dp.state.py=-1;dp.state.done=false;
+   drawWalls();moveCursor();dp.textLine('maze: find exit');
+   if(say)dp.speak(dp.L('새 미로입니다. 왼쪽 위에서 출발, 오른쪽 아래가 출구예요.', 'New maze. Start top-left, exit bottom-right.'));
+  }
+  reset(false);
+  dp.onKey(function(k){
+   if(k==='F2'){reset(true);return;}
+   if(dp.state.done)return;
+   var dx=0,dy=0;
    if(k==='F1')dy=-st;else if(k==='F4')dy=st;else if(k==='PAN_LEFT')dx=-st;else if(k==='PAN_RIGHT')dx=st;else return;
    var nx=dp.state.x+dx,ny=dp.state.y+dy;
-   if(nx>=56&&ny>=32){dp.state.x=nx;dp.state.y=ny;moveCursor();dp.textLine('escape!');dp.speak(dp.L('탈출 성공! 축하합니다.', 'You escaped! Congratulations.'));return;}
+   if(nx>=56&&ny>=32){dp.state.x=nx;dp.state.y=ny;dp.state.done=true;moveCursor();dp.textLine('escape!');dp.speak(dp.L('탈출 성공! 축하합니다. 에프2를 누르면 새 미로가 나와요.', 'You escaped! Congratulations. Press F2 for a new maze.'));return;}
    if(hit(nx,ny)){dp.speak(dp.L('벽입니다', 'Wall.'));return;}
    dp.state.x=nx;dp.state.y=ny;moveCursor();});
  }},
@@ -1840,11 +1870,25 @@ list_nav:{
   });
  }},
 quiz:{
- schema:'questions:[{q:질문, options:[보기3개], answer:정답인덱스0~2}] 배열(필수) — F1~F3 선택',
+ schema:'questions:[{q:질문, options:[보기3개], answer:정답인덱스0~2}] 배열(필수) · review:true=오답 복습(sd_wrong) — F1~F3 선택',
  defaults:{questions:[{q:'1 더하기 1은?',options:['1','2','3'],answer:1}]},
  run:function(dp,p){
-  var qs=(p.questions||[]).filter(function(q){return q&&q.q&&q.options&&q.options.length>=2;}).slice(0,20);
-  if(!qs.length)qs=[{q:'1 더하기 1은?',options:['1','2','3'],answer:1}];
+  function loadW(){try{return JSON.parse(localStorage.getItem('sd_wrong')||'[]');}catch(e){return [];}}
+  function saveW(list){try{localStorage.setItem('sd_wrong',JSON.stringify(list.slice(-50)));}catch(e){}}
+  var review=!!p.review,qs;
+  if(review){
+   qs=loadW();
+   if(!qs.length){
+    dp.clear();dp.textLine('no wrong answers');
+    drawBrailleBlock(dp,dp.L('오답 없음','no wrongs'),{per:20,lines:8,gapY:5});
+    dp.speak(dp.L('저장된 오답이 없어요. 퀴즈를 풀면 틀린 문제가 자동으로 모입니다.', 'No wrong answers saved yet. They collect automatically as you take quizzes.'));
+    dp.onKey(function(){});return;
+   }
+   dp.speak(dp.L('오답 복습. '+qs.length+'문제입니다. 이번에 맞히면 오답 노트에서 지워져요.', 'Wrong-answer review, '+qs.length+' questions. Correct answers are removed from the note.'));
+  }else{
+   qs=(p.questions||[]).filter(function(q){return q&&q.q&&q.options&&q.options.length>=2;}).slice(0,20);
+   if(!qs.length)qs=[{q:'1 더하기 1은?',options:['1','2','3'],answer:1}];
+  }
   dp.state.i=0;dp.state.score=0;dp.state.done=false;dp.state.busy=false;
   function ask(){
    var q=qs[dp.state.i];dp.clear();
@@ -1866,6 +1910,8 @@ quiz:{
    var sel={'F1':0,'F2':1,'F3':2}[k];if(sel===undefined||sel>=qs[dp.state.i].options.length)return;
    var q=qs[dp.state.i],ok=(sel===q.answer);
    if(ok)dp.state.score++;
+   if(!ok){var W=loadW();if(!W.some(function(w){return w.q===q.q;})){W.push({q:q.q,options:q.options,answer:q.answer});saveW(W);}}   // 오답 노트 적립
+   else if(review){saveW(loadW().filter(function(w){return w.q!==q.q;}));}                                                             // 복습에서 맞히면 삭제
    dp.state.busy=true;
    feedback(ok);
    dp.speak(ok?dp.L('정답입니다','Correct'):dp.L('오답입니다. 정답은 '+(q.answer+1)+'번 '+q.options[q.answer], 'Wrong. The answer is number '+(q.answer+1)+', '+q.options[q.answer]));
@@ -1901,7 +1947,15 @@ timer:{
   dp.interval(1000,function(){
    if(!dp.state.run)return;
    dp.state.t+=down?-1:1;
-   if(down&&dp.state.t<=0){dp.state.t=0;dp.state.run=false;drawBar();dp.textLine('time up!');dp.speak(dp.L('시간이 다 됐습니다', 'Time is up.'));return;}
+   if(down&&dp.state.t<=0){
+    dp.state.t=0;dp.state.run=false;dp.textLine('time up!');dp.speak(dp.L('시간이 다 됐습니다', 'Time is up.'));
+    var n=0,pid=dp.interval(400,function(){                    // 촉각 알람: 전체 핀 펄스 5회 — 음성을 못 듣는 상황 대비
+     n++;
+     if(n>10){clearInterval(pid);drawBar();tick();return;}
+     if(n%2)dp.rect(0,0,60,40,{fill:true});else dp.clear();
+    });
+    return;
+   }
    tick();
   });
   dp.onKey(function(k){
@@ -2033,40 +2087,45 @@ map:{
   });
  }},
 xlate:{
- schema:'to:대상언어 en|ko|ja(기본 반대언어) — 음성을 실시간 번역해 점자/음성. 온라인 필요. F1 지우기 F2 일시정지',
+ schema:'to:대상언어 en|ko|ja(미지정 시 한↔영 양방향 자동) — 음성을 실시간 번역해 점자/음성. 온라인 필요. F1 지우기 F2 일시정지 F3 인식 언어 전환',
  defaults:{},
  run:function(dp,p){
+  var auto=!p.to;                                     // 대상 미지정 → 문장 언어를 감지해 한↔영 자동
   var to=p.to||(LANG==='en'?'ko':'en');
-  var langName={en:'영어',ko:'한국어',ja:'일본어'}[to]||to;
+  function targetFor(src){return auto?(src==='ko'?'en':'ko'):to;}
+  function nameOf(t){return {en:'영어',ko:'한국어',ja:'일본어'}[t]||t;}
   dp.state.txt='';dp.state.on=true;dp.state.warned=false;
   function render(){drawBrailleBlock(dp,dp.state.txt);}
-  dp.textLine('translate '+to);render();
+  function label(){return auto?'translate auto':'translate '+to;}
+  dp.textLine(label());render();
   function onTrans(out){out=(out||'').trim();if(!out)return;dp.state.txt+=out+' ';render();dp.speak(out);}
   function transFail(){if(!dp.state.warned){dp.state.warned=true;dp.speak(dp.L('번역 서버에 연결할 수 없습니다. 설정을 확인하세요.','Cannot reach translation server. Check setup.'));}}
-  function remoteTranslate(src){
+  function remoteTranslate(src,tgt){
    try{
     var nb=nimBase();
     if(nb){   // NVIDIA NIM 번역(riva-translate) 경로
-     fetch(nb+'/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:src,target:to})})
+     fetch(nb+'/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:src,target:tgt})})
      .then(function(r){return r.json();})
      .then(function(j){onTrans((j&&(j.text||j.translation||j.result))||'');})
      .catch(transFail);
      return;
     }
     fetch(SD.api(),{method:'POST',headers:{'Content-Type':'application/json'},   // 폴백: Anthropic 프록시
-     body:JSON.stringify({model:AI_MODEL,max_tokens:300,system:'You are a translator. Translate the user text to '+langName+'. Output only the translation, no notes.',messages:[{role:'user',content:src}]})})
+     body:JSON.stringify({model:AI_MODEL,max_tokens:300,system:'You are a translator. Translate the user text to '+nameOf(tgt)+'. Output only the translation, no notes.',messages:[{role:'user',content:src}]})})
     .then(function(r){return r.json();})
     .then(function(j){if(j.error)throw new Error(j.error.message||'api');onTrans((j.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join(' '));})
     .catch(transFail);
    }catch(e){}
   }
   function translate(src){   // 1순위: 크롬 내장 온디바이스 번역 → 없으면 원격(NIM/Anthropic)
-   odTranslate(src,to).then(function(out){ if(out!=null)onTrans(out); else remoteTranslate(src); });
+   var tgt=targetFor(detectTextLang(src));
+   odTranslate(src,tgt).then(function(out){ if(out!=null)onTrans(out); else remoteTranslate(src,tgt); });
   }
   dp.listen(function(t,fin){if(!dp.state.on)return;if(fin){var s=String(t).trim();if(s)translate(s);}});
   dp.onKey(function(k){
    if(k==='F1'){dp.state.txt='';render();dp.speak(dp.L('지웠습니다','Cleared'));}
-   else if(k==='F2'){dp.state.on=!dp.state.on;dp.textLine(dp.state.on?'translate '+to:'paused');dp.speak(dp.state.on?dp.L('재개','Resumed'):dp.L('일시정지','Paused'));}
+   else if(k==='F2'){dp.state.on=!dp.state.on;dp.textLine(dp.state.on?label():'paused');dp.speak(dp.state.on?dp.L('재개','Resumed'):dp.L('일시정지','Paused'));}
+   else if(k==='F3'){var nl=(dp._listenLang==='en')?'ko':'en';dp.setListenLang(nl);dp.textLine(nl==='en'?'listen EN':'listen KO');dp.speak(nl==='en'?'English recognition':'한국어 인식');}   // 브라우저 인식은 단일 언어 — 입력 언어 전환(출력은 자동으로 반대)
   });
  }},
 doc:{
@@ -2156,14 +2215,18 @@ calc:{
     .replace(/,/g,'');
    return s.replace(/[^\d+\-*/().%\s]/g,'').trim();          // 잔여 문자는 제거 → 숫자/연산자만
   }
-  function compute(s){
-   var e=norm(s);
+  function evalExpr(e){
    if(!/\d/.test(e)||!/^[\d+\-*/().%\s]+$/.test(e))return null;
    try{
     var v=Function('"use strict";return('+e+')')();
     if(typeof v!=='number'||!isFinite(v))return null;
     return {e:e.replace(/\s+/g,''),v:Math.round(v*1e10)/1e10};
    }catch(err){return null;}
+  }
+  function compute(s){
+   var e=norm(s);
+   if(dp.state.res&&/^[+\-*/]/.test(e))return evalExpr(String(dp.state.res.v)+e);   // 연속 계산: "곱하기 2"처럼 연산자로 시작하면 직전 결과에 이어서
+   return evalExpr(e);
   }
   function sayOp(e){return e.replace(/\*/g,dp.L(' 곱하기 ',' times ')).replace(/\//g,dp.L(' 나누기 ',' divided by ')).replace(/\+/g,dp.L(' 더하기 ',' plus ')).replace(/-/g,dp.L(' 빼기 ',' minus '));}
   function show(r){
@@ -2182,7 +2245,9 @@ calc:{
     if(r)show(r);
     else dp.speak(dp.L('식을 이해하지 못했어요. 에프1을 누르고 "12 곱하기 34"처럼 말해주세요.', 'I could not parse that. Press F1 and say something like "12 times 34".'));
    });
-   if(ok)dp.speak(dp.L('듣고 있어요. 계산할 식을 말하세요.', 'Listening. Say the expression to calculate.'));
+   if(ok)dp.speak(dp.state.res
+    ?dp.L('듣고 있어요. 새 식을 말하거나, "곱하기 2"처럼 이어서 계산할 수 있어요.', 'Listening. Say a new expression, or continue like "times 2".')
+    :dp.L('듣고 있어요. 계산할 식을 말하세요.', 'Listening. Say the expression to calculate.'));
   }
   var r0=p.expr?compute(p.expr):null;
   if(r0)show(r0);
@@ -2305,6 +2370,23 @@ timetable:{
     dp.speak(dp.L('오늘 '+days[di]+'요일. '+o.join(', '), 'Today '+days[di]+'. '+o.join(', ')));
    }
    else if(k==='F3')dp.speak(dp.L('주간 시간표. 요일 '+nd+'개, '+nr+'교시.', 'Weekly timetable. '+nd+' days, '+nr+' periods.'));
+   else if(k==='F4'){                                          // 지금 몇 교시 — 기본 시정: 1교시 09:00, 50분 수업+10분 휴식
+    var dNow=new Date(),wd2=dNow.getDay(),mins=dNow.getHours()*60+dNow.getMinutes(),start=9*60;
+    if(wd2<1||wd2>nd){dp.speak(dp.L('오늘은 시간표에 없는 요일이에요.', 'Today is not on the timetable.'));return;}
+    var di2=wd2-1,found=null;
+    for(var pi=0;pi<nr;pi++){
+     var s2=start+pi*60,e2=s2+50;
+     if(mins>=s2&&mins<e2){found={p:pi,in:true};break;}
+     if(mins>=e2&&mins<s2+60&&pi<nr-1){found={p:pi+1,in:false};break;}
+    }
+    if(!found){dp.speak(dp.L('지금은 수업 시간이 아니에요. 기본 시정은 1교시 9시부터 50분 수업입니다.', 'Not during class hours. Default schedule starts period 1 at 9:00, 50-minute classes.'));return;}
+    dp.state.r=found.p;draw();
+    var subj=rows[found.p][di2]||dp.L('없음','none');
+    dp.textLine(((found.p+1)+dp.L('교시 ','P '))+subj);
+    dp.speak(found.in
+     ?dp.L('지금은 '+(found.p+1)+'교시, '+days[di2]+'요일 '+subj+' 시간이에요.', 'Now period '+(found.p+1)+': '+subj+'.')
+     :dp.L('지금은 쉬는 시간이에요. 다음은 '+(found.p+1)+'교시 '+subj+'.', 'Break time. Next is period '+(found.p+1)+': '+subj+'.'));
+   }
   });
  }},
 checklist:{
@@ -2452,7 +2534,7 @@ var KEYMAP={
  dice:{F1:['굴리기','roll']},
  clock:{F1:['시각','time']},
  rps:{F1:['가위','sciss'],F2:['바위','rock'],F3:['보','paper']},
- maze:{F1:['위','up'],F4:['아래','down'],PL:['왼쪽','left'],PR:['오른쪽','right']},
+ maze:{F1:['위','up'],F2:['새 미로','new'],F4:['아래','down'],PL:['왼쪽','left'],PR:['오른쪽','right']},
  timer:{F1:['시작/정지','start'],F2:['리셋','reset'],F3:['남은시간','time']},
  caption:{F1:['지우기','clear'],F2:['일시정지','pause'],F3:['언어 전환','lang']},
  minutes:{F1:['저장','save'],F2:['일시정지','pause'],F3:['언어 전환','lang'],F4:['지우기','clear'],PL:['이전','prev'],PR:['다음','next']},
@@ -2460,7 +2542,7 @@ var KEYMAP={
  coord_plane:{F1:['좌표읽기','read'],F2:['처음','first'],PL:['이전','prev'],PR:['다음','next']},
  graph_explore:{F1:['좌표읽기','read'],F2:['함수변경','func'],PL:['왼쪽','left'],PR:['오른쪽','right']},
  map:{F1:['위치읽기','read'],F2:['처음','first'],PL:['이전','prev'],PR:['다음','next']},
- xlate:{F1:['지우기','clear'],F2:['일시정지','pause']},
+ xlate:{F1:['지우기','clear'],F2:['일시정지','pause'],F3:['언어 전환','lang']},
  doc:{F1:['읽기','read'],F2:['처음','first'],PL:['이전 페이지','prev'],PR:['다음 페이지','next']},
  list_nav:{F1:['반복','repeat'],F2:['처음','first'],PL:['이전','prev'],PR:['다음','next']},
  quiz:{F1:['1번','opt1'],F2:['2번','opt2'],F3:['3번','opt3']},
@@ -2474,7 +2556,7 @@ var KEYMAP={
  calc:{F1:['음성 입력','speak'],F2:['다시 읽기','repeat'],F3:['지우기','clear']},
  memo:{F1:['녹음','rec'],F2:['삭제','delete'],F3:['언어 전환','lang'],F4:['저장','save'],PL:['이전','prev'],PR:['다음','next']},
  braille_doc:{F1:['읽기','read'],F2:['처음','first'],PL:['이전 페이지','prev'],PR:['다음 페이지','next']},
- timetable:{F1:['교시 낭독','read'],F2:['오늘','today'],F3:['요약','summary'],PL:['이전 교시','prev'],PR:['다음 교시','next']},
+ timetable:{F1:['교시 낭독','read'],F2:['오늘','today'],F3:['요약','summary'],F4:['지금 교시','now'],PL:['이전 교시','prev'],PR:['다음 교시','next']},
  checklist:{F1:['체크','check'],F2:['진행 상황','progress'],F3:['모두 해제','reset'],PL:['이전','prev'],PR:['다음','next']},
  convert:{F1:['음성 입력','speak'],F2:['다시 읽기','repeat']},
  catalog:{F1:['실행','run'],F2:['예시','example'],PL:['이전','prev'],PR:['다음','next']}
@@ -2600,7 +2682,7 @@ var MATCH_RULES=[
  {t:'caption',kw:[['자막',5],['한글 자막',6],['받아쓰',5],['받아 적',4],['말을 글로',4],['말하면',2],['음성',1],['caption',6],['subtitle',5],['live caption',6],['speech to text',6],['transcribe',5],['dictation',4]]},
  {t:'clock',kw:[['시계',5],['시각',4],['몇 시',4],['몇시',4],['지금 시간',5],['현재 시간',5],['clock',6],['time',3],['what time is it',6],['current time',5],['what time',4]]},
  {t:'timer',kw:[['타이머',5],['카운트다운',5],['카운트 다운',5],['알람',4],['깨워줘',4],['스톱워치',5],['스탑워치',5],['timer',6],['set a timer',6],['alarm',4],['countdown',5],['stopwatch',5]]},
- {t:'quiz',kw:[['퀴즈',5],['문제 내',4],['문제 풀',4],['시험 문제',4],['구구단',5],['암산',5],['덧셈',4],['뺄셈',4],['곱셈',3],['시험',2],['맞히',2],['맞추',2],['quiz',6],['test me',5],['multiplication',5],['times table',5],['mental math',5],['addition',4],['subtraction',4],['test',2]],needAI:true},
+ {t:'quiz',kw:[['퀴즈',5],['문제 내',4],['문제 풀',4],['시험 문제',4],['구구단',5],['암산',5],['덧셈',4],['뺄셈',4],['곱셈',3],['오답 복습',8],['오답 노트',8],['오답',6],['틀린 문제',7],['시험',2],['맞히',2],['맞추',2],['quiz',6],['test me',5],['wrong answers',7],['multiplication',5],['times table',5],['mental math',5],['addition',4],['subtraction',4],['test',2]],needAI:true},
  {t:'plot',kw:[['사인',5],['코사인',5],['싸인',5],['파형',4],['곡선',3],['함수',2],['sine',6],['cosine',5],['sin wave',5],['waveform',4],['curve',3],['function',2],['graph',2]]},
  {t:'bar_chart',kw:[['막대',4],['막대그래프',5],['차트',3],['매출',2],['통계',2],['그래프',2],['수치 비교',4],['비교',1],['bar chart',5],['bar graph',5],['barchart',5],['sales',2],['statistics',2],['chart',2]]},
  {t:'list_nav',kw:[['메뉴',4],['목록',4],['목차',4],['리스트',4],['시간표',5],['알림장',5],['숙제',4],['명단',4],['단계',2],['순서',2],['차례',2],['menu',4],['list',3],['list of',4],['timetable',5],['schedule',5],['roster',4],['homework',4],['steps',2]]},
@@ -2698,7 +2780,8 @@ function localMatch(req){
     var ct=req.replace(/\d+\s*명씩/,'').replace(/of\s*\d+/i,'').match(/(\d+)\s*명/)||req.match(/(\d+)\s*(?:people|students|kids)/i);if(ct)params.count=+ct[1];
   }
   else if(t==='quiz'){
-    if(/구구단|times table|multiplication/i.test(low)){
+    if(/오답|틀린 문제|wrong answer/i.test(low)){params.review=true;needAI=false;}
+    else if(/구구단|times table|multiplication/i.test(low)){
       var dan=req.match(/([2-9])\s*(?:단|times)/i),d=dan?+dan[1]:2+Math.floor(Math.random()*8),qs=[];
       var ks=[2,3,4,5,6,7,8,9];
       shuffle(ks);
@@ -2739,7 +2822,8 @@ function localMatch(req){
     params.fn=/코사인|cosine|cos/i.test(low)?'cos':(/직선|일차|linear|line/i.test(low)?'line':(/포물|이차|parab|quadratic/i.test(low)?'parab':'sin'));
   }
   else if(t==='xlate'){
-    params.to=/영어|english|영문/i.test(low)?'en':(/일본|japanese|일어/i.test(low)?'ja':(/한국어|korean|한글/i.test(low)?'ko':(LANG==='en'?'ko':'en')));
+    var xt=/영어|english|영문/i.test(low)?'en':(/일본|japanese|일어/i.test(low)?'ja':(/한국어|korean|한글/i.test(low)?'ko':null));
+    if(xt)params.to=xt;                                // 언어 미지정 → 한↔영 양방향 자동
   }
   else if(t==='doc'){
     var dq=req.match(/["'“”‘'](.+?)["'“”‘']/);
