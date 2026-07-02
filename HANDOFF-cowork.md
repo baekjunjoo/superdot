@@ -31,7 +31,7 @@
 4. **BoardInfo 동기화**: `onMessage 'Connected'` 후에만 전송 시작.
 5. **점자 변환 테이블**(`brailleCells`, `KCHO/KJUNG/KJONG`, `KR_A`, `KR_RIME`, `EN_WORD` 등): 개정 한국 점자 129건 + UEB G2 검증. **값 수정 금지**.
 6. **단일 파일 배포**: 앱 로직을 여러 .js로 분리하면 배포가 깨짐(빌드 없음). SDK·worker·liblouis는 별도 파일 OK(기존 패턴).
-7. **localStorage**(`sd_cfg`, `sd_lib`, `sd_lang`, `sd_memo`(음성 메모), `sd_minutes`(회의록 자동 보존))는 배포본에서 정상 — 그대로 둘 것.
+7. **localStorage**(`sd_cfg`, `sd_lib`, `sd_lang`, `sd_memo`(음성 메모), `sd_minutes`(회의록 자동 보존), `sd_miss`(미매칭 로그·최근 100), `sd_learn`(T3 슬롯필 학습·최대 200))는 배포본에서 정상 — 그대로 둘 것.
 8. **[신규] 다중 기기 미러링**: BLE는 `BLE.devs[]` 배열 + 공용 `_capture()` 로 관리. 캡처/전송은 **기기별 fan-out**(pump가 기기별 `lastSent`로 행 차분), 전송 간격 = `MIN_INTERVAL × 기기수`(대역폭 보호). **단일 `BLE.dev`로 되돌리지 말 것.** 최대 5대(`BLE.MAX`).
 9. **[신규] 페이지 방식 렌더**: 라이브 자막·회의록 실시간 표시는 `drawBrailleBlock(dp,s,{page:true})`. **줄 스크롤로 되돌리면 "줄 넘길 때마다 전체 리프레시" 문제 재발.**
 10. **[신규] TTS 문장 언어 자동 감지**: `detectTextLang`/`pickVoiceFor` — 한글/영문에 따라 음성 자동 선택, 언어별 음성 캐시(같은 언어 내 교체 방지). 유지.
@@ -84,6 +84,7 @@ node --check /tmp/app.js
 - 검증: 기존 매처 40발화 스냅샷 전후 동일, 신규 매칭 12발화 확인, mock 스모크(템플릿 27종·ebrl 왕복·교실 라우팅) 통과.
 - **NVDA 대응**: SETUP 12필드 label-for 연결, ttsBtn aria-pressed, 부팅 시 스크린리더 안내 1줄(TTS OFF 시 콘솔 라이브 리전으로만 낭독).
 - **비시각 사용성(워크스루 기반)**: ①로드 후 무음 감지 — `tts._n` 카운터로 loadFeature가 "런타임이 아무 말도 안 한 로드"(구형 템플릿 T2/RUN/카탈로그)를 감지해 `CATALOG_LIST` 표시명+`keymapGuide()`(KEYMAP→음성 키 안내)를 자동 발화. 인트로 있는 기능·speakIntro=false 부팅 로드는 미발화. ②minutes 복구를 자체 TTS로도 안내(700ms 지연), F4 삭제는 4초 내 2회 확인. ③quiz 피드백 중 입력에 "잠시만요" 응답.
+- **매처 확장 3종**: ①MATCH_RULES 한/영 동의어 대폭 보강(알람/지금 시간/어휘/메모해/환산/제비뽑기/what time is it/how many inches 등 — 기존 40발화 스냅샷 점수까지 완전 동일 유지, 'quiz me'처럼 기존 발화 점수를 바꾸는 키워드는 제외 원칙) ②미매칭 로그 `sd_miss`(localMatch null 시 기록, 발화 "미매칭 목록"/"미매칭 삭제"로 열람·정리 — 사전 보강용 현장 데이터) ③T3 슬롯필 성공 시 `sd_learn`에 `learnKey(정규화 문장)→spec` 저장, T2 실패 시 **T2.5 학습 재사용**으로 오프라인 처리(문장부호·공백 변형도 정규화로 흡수. 동일 원문은 T1 라이브러리가 먼저 잡음).
 - **2차 워크스루 수정**: T2 채팅 표시명을 `tplDisplayName`(LOCAL: 접두 제거), 되묻기(clarify)와 생성 실패를 음성으로도 안내, convert `findUnits` 채움문자 NUL→공백(파일이 바이너리 판정되던 문제 — **소스에 제어문자 금지**).
 - **오프라인 보강 4종**: ①OPEN이 `.csv` 지원 — 2열=vocab, 3열+=quiz(quizFromRows), 요일 헤더=timetable, 1열=list_nav. 헤더 자동 감지(2행 이상일 때만). CSV 기능은 스펙 기반이라 라이브러리에 저장(동명 파일 재열기 시 교체). ②`catalog` 템플릿+칩("기능 목록") — 팬 탐색, F1 즉시 실행. 숨김 6종·braille_doc 미노출 유지. ③minutes 자동 보존(`sd_minutes`, 문장마다 저장·F4 삭제·재로드 시 복구+announce). ④생활 템플릿 timetable/checklist/convert(길이·무게·온도, 단위사전 UD·영문 단어경계 처리).
 

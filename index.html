@@ -2546,36 +2546,36 @@ function addMsg(cls,html){var d=document.createElement('div');d.className='msg '
 
 /* ═══════════ TIER 2: 로컬 매칭 — 키워드 점수 + 정규식 파라미터 추출 (오프라인) ═══════════ */
 var MATCH_RULES=[
- {t:'vocab',kw:[['단어장',5],['단어 카드',5],['낱말 카드',5],['낱말카드',5],['영단어',4],['불규칙 동사',5],['불규칙동사',5],['속담',5],['사자성어',5],['고사성어',5],['단어',2],['카드',2],['사전',3],['용어',2],['vocab',5],['vocabulary',5],['word list',5],['word card',5],['flashcard',5],['flash card',5],['sight word',5],['irregular verb',5],['proverb',5],['idiom',5],['words',2]]},
- {t:'braille_learn',kw:[['점자 배우',6],['점자배우',6],['점자 학습',6],['점자 공부',6],['점자 연습',5],['자모',5],['알파벳',5],['한글 배우',5],['한글배우',5],['파닉스',5],['learn braille',6],['braille practice',6],['teach braille',6],['alphabet',5],['phonics',5],['letters',2]]},
+ {t:'vocab',kw:[['단어장',5],['단어 카드',5],['낱말 카드',5],['낱말카드',5],['영단어',4],['불규칙 동사',5],['불규칙동사',5],['속담',5],['사자성어',5],['고사성어',5],['단어',2],['카드',2],['사전',3],['용어',2],['어휘',4],['낱말',4],['단어 외우',5],['단어 공부',5],['vocab',5],['vocabulary',5],['word list',5],['word card',5],['flashcard',5],['flash card',5],['sight word',5],['irregular verb',5],['proverb',5],['idiom',5],['word practice',5],['study words',5],['words',2]]},
+ {t:'braille_learn',kw:[['점자 배우',6],['점자배우',6],['점자 학습',6],['점자 공부',6],['점자 연습',5],['점자 익히',6],['자모',5],['알파벳',5],['한글 배우',5],['한글배우',5],['파닉스',5],['learn braille',6],['braille practice',6],['braille lesson',6],['teach braille',6],['alphabet',5],['phonics',5],['letters',2]]},
  {t:'number_line',kw:[['수직선',5],['음수',4],['양수',3],['수의 크기',3],['number line',6],['negative number',4],['integer',3]]},
- {t:'fraction',kw:[['분수',5],['fraction',6]]},
- {t:'picker',kw:[['뽑기',5],['추첨',5],['뽑아줘',5],['뽑아 줘',5],['발표 순서',6],['발표순서',6],['모둠',5],['조 나누',5],['자리 바꾸',5],['자리바꾸',5],['순서 정해',4],['random pick',6],['picker',5],['draw a number',5],['presentation order',6],['group',4],['groups',4],['shuffle',3],['raffle',5]]},
+ {t:'fraction',kw:[['분수',5],['분의',4],['fraction',6]]},
+ {t:'picker',kw:[['뽑기',5],['추첨',5],['뽑아줘',5],['뽑아 줘',5],['제비뽑기',6],['제비 뽑기',6],['랜덤 뽑기',6],['발표 순서',6],['발표순서',6],['모둠',5],['조 나누',5],['자리 바꾸',5],['자리바꾸',5],['순서 정해',4],['random pick',6],['picker',5],['draw a number',5],['pick a number',6],['presentation order',6],['group',4],['groups',4],['shuffle',3],['raffle',5]]},
  {t:'rps',kw:[['가위바위보',5],['가위 바위 보',5],['rock paper scissors',6],['rps',5]]},
- {t:'dice',kw:[['주사위',5],['굴리',1],['dice',6],['roll',3],['die',4]]},
- {t:'maze',kw:[['미로',5],['maze',6],['labyrinth',5]]},
- {t:'minutes',kw:[['회의록',6],['회의 기록',6],['회의기록',6],['회의 내용',4],['회의 메모',5],['회의 정리',5],['미팅 노트',5],['미팅노트',5],['회의',3],['녹취',5],['녹취록',6],['속기',5],['meeting minutes',6],['meeting notes',6],['meeting log',5],['minutes',5],['transcript save',5]]},
- {t:'caption',kw:[['자막',5],['받아쓰',5],['받아 적',4],['말하면',2],['음성',1],['caption',6],['subtitle',5],['live caption',6],['transcribe',5],['dictation',4]]},
- {t:'clock',kw:[['시계',5],['시각',4],['몇 시',4],['clock',6],['time',3],['what time',4]]},
- {t:'timer',kw:[['타이머',5],['카운트다운',5],['스톱워치',5],['스탑워치',5],['timer',6],['countdown',5],['stopwatch',5]]},
- {t:'quiz',kw:[['퀴즈',5],['문제 내',4],['구구단',5],['암산',5],['덧셈',4],['뺄셈',4],['곱셈',3],['시험',2],['맞히',2],['맞추',2],['quiz',6],['multiplication',5],['times table',5],['mental math',5],['addition',4],['subtraction',4],['test',2]],needAI:true},
+ {t:'dice',kw:[['주사위',5],['주사위 던',5],['굴리',1],['dice',6],['dice roll',6],['throw a dice',6],['roll',3],['die',4]]},
+ {t:'maze',kw:[['미로',5],['미궁',4],['maze',6],['labyrinth',5]]},
+ {t:'minutes',kw:[['회의록',6],['회의 기록',6],['회의기록',6],['회의 내용',4],['회의 메모',5],['회의 정리',5],['회의 요약',5],['기록 시작',5],['미팅 노트',5],['미팅노트',5],['회의',3],['녹취',5],['녹취록',6],['속기',5],['meeting minutes',6],['meeting notes',6],['meeting log',5],['take notes',5],['minutes',5],['transcript save',5]]},
+ {t:'caption',kw:[['자막',5],['한글 자막',6],['받아쓰',5],['받아 적',4],['말을 글로',4],['말하면',2],['음성',1],['caption',6],['subtitle',5],['live caption',6],['speech to text',6],['transcribe',5],['dictation',4]]},
+ {t:'clock',kw:[['시계',5],['시각',4],['몇 시',4],['몇시',4],['지금 시간',5],['현재 시간',5],['clock',6],['time',3],['what time is it',6],['current time',5],['what time',4]]},
+ {t:'timer',kw:[['타이머',5],['카운트다운',5],['카운트 다운',5],['알람',4],['깨워줘',4],['스톱워치',5],['스탑워치',5],['timer',6],['set a timer',6],['alarm',4],['countdown',5],['stopwatch',5]]},
+ {t:'quiz',kw:[['퀴즈',5],['문제 내',4],['문제 풀',4],['시험 문제',4],['구구단',5],['암산',5],['덧셈',4],['뺄셈',4],['곱셈',3],['시험',2],['맞히',2],['맞추',2],['quiz',6],['test me',5],['multiplication',5],['times table',5],['mental math',5],['addition',4],['subtraction',4],['test',2]],needAI:true},
  {t:'plot',kw:[['사인',5],['코사인',5],['싸인',5],['파형',4],['곡선',3],['함수',2],['sine',6],['cosine',5],['sin wave',5],['waveform',4],['curve',3],['function',2],['graph',2]]},
- {t:'bar_chart',kw:[['막대',4],['차트',3],['매출',2],['통계',2],['그래프',2],['비교',1],['bar chart',5],['bar graph',5],['barchart',5],['sales',2],['statistics',2],['chart',2]]},
- {t:'list_nav',kw:[['메뉴',4],['목록',4],['리스트',4],['시간표',5],['알림장',5],['숙제',4],['명단',4],['단계',2],['순서',2],['차례',2],['menu',4],['list',3],['timetable',5],['schedule',5],['roster',4],['homework',4],['steps',2]]},
- {t:'text_show',kw:[['점자로',4],['점자 출력',4],['써줘',2],['보여줘',1],['표시해',1],['in braille',4],['show braille',4],['display text',3]]},
- {t:'weather',kw:[['날씨',6],['기온',5],['몇 도',4],['weather',6],['temperature',5],['forecast',5]]},
+ {t:'bar_chart',kw:[['막대',4],['막대그래프',5],['차트',3],['매출',2],['통계',2],['그래프',2],['수치 비교',4],['비교',1],['bar chart',5],['bar graph',5],['barchart',5],['sales',2],['statistics',2],['chart',2]]},
+ {t:'list_nav',kw:[['메뉴',4],['목록',4],['목차',4],['리스트',4],['시간표',5],['알림장',5],['숙제',4],['명단',4],['단계',2],['순서',2],['차례',2],['menu',4],['list',3],['list of',4],['timetable',5],['schedule',5],['roster',4],['homework',4],['steps',2]]},
+ {t:'text_show',kw:[['점자로',4],['점자 출력',4],['점자로 써',5],['써줘',2],['보여줘',1],['표시해',1],['in braille',4],['show braille',4],['braille for',5],['display text',3]]},
+ {t:'weather',kw:[['날씨',6],['날씨 어때',7],['기온',5],['몇 도',4],['우산',4],['비 와',4],['비 오',4],['weather',6],['weather today',7],['is it raining',6],['temperature',5],['forecast',5]]},
  {t:'coord_plane',kw:[['좌표평면',7],['좌표 평면',7],['좌표계',6],['coordinate plane',7],['xy 좌표',5],['좌표 찍',5]]},
  {t:'graph_explore',kw:[['그래프 탐색',11],['그래프탐색',11],['함수 탐색',10],['그래프 따라',10],['곡선 탐색',10],['explore graph',11],['graph explore',11],['trace graph',10]]},
  {t:'map',kw:[['촉각지도',8],['촉각 지도',8],['지도 탐색',7],['한국 지도',7],['지도',5],['tactile map',8],['map',4]]},
- {t:'xlate',kw:[['실시간 번역',8],['번역 자막',8],['번역자막',8],['통역',6],['번역',5],['외국어 자막',7],['real-time translation',8],['translate caption',8],['translation',6],['interpret',5]]},
- {t:'doc',kw:[['문서 뷰어',8],['문서뷰어',8],['점자 뷰어',8],['문서 보기',6],['문서 읽',6],['본문 읽',5],['긴 글',5],['document viewer',8],['braille viewer',8],['read document',6]]},
- {t:'shape',kw:[['도형',5],['삼각형',6],['사각형',6],['오각형',6],['육각형',6],['다각형',5],['기하',5],['꼭짓점',5],['내각',5],['shape',5],['triangle',6],['square',5],['pentagon',6],['hexagon',6],['polygon',5],['geometry',5],['vertex',5]]},
- {t:'calc',kw:[['계산기',6],['계산해',5],['사칙연산',6],['계산',4],['곱하기',4],['나누기',4],['더하기',4],['빼기',4],['얼마야',3],['calculator',6],['calculate',5],['arithmetic',5]]},
- {t:'memo',kw:[['음성 메모',7],['음성메모',7],['메모장',5],['메모',4],['voice memo',7],['voice note',6],['memo',5]]},
- {t:'timetable',kw:[['주간 시간표',9],['주간시간표',9],['시간표 격자',9],['요일별 시간표',9],['요일별시간표',9],['weekly timetable',9],['weekly schedule',8],['timetable grid',9]]},
- {t:'checklist',kw:[['체크리스트',7],['체크 리스트',7],['준비물',6],['할 일',5],['할일',5],['checklist',7],['check list',7],['to-do',6],['todo',6],['to do list',6]]},
- {t:'convert',kw:[['단위 변환',8],['단위변환',8],['변환기',6],['인치로',6],['센티로',6],['센치로',6],['마일로',6],['파운드로',6],['화씨로',6],['섭씨로',6],['몇 인치',6],['몇 마일',6],['몇 파운드',6],['unit conversion',8],['convert to',6],['in inches',6],['to miles',6],['to fahrenheit',6],['to celsius',6],['in pounds',6]]},
- {t:'catalog',kw:[['기능 목록',8],['기능목록',8],['뭐 할 수 있',7],['무엇을 할 수',7],['어떤 기능',6],['도움말',6],['명령어',5],['feature list',8],['what can you do',8],['help',5],['catalog',6]]}
+ {t:'xlate',kw:[['실시간 번역',8],['번역 자막',8],['번역자막',8],['통역',6],['통역해',7],['번역',5],['외국어 자막',7],['real-time translation',8],['translate caption',8],['translate to',7],['translation',6],['interpret',5]]},
+ {t:'doc',kw:[['문서 뷰어',8],['문서뷰어',8],['점자 뷰어',8],['문서 보기',6],['문서 읽',6],['본문 읽',5],['긴 글',5],['긴 문서',6],['document viewer',8],['braille viewer',8],['read document',6]]},
+ {t:'shape',kw:[['도형',5],['도형 그려',6],['삼각형',6],['사각형',6],['정사각형',6],['직사각형',5],['오각형',6],['육각형',6],['다각형',5],['원 그려',5],['기하',5],['꼭짓점',5],['내각',5],['shape',5],['triangle',6],['square',5],['circle',4],['pentagon',6],['hexagon',6],['polygon',5],['geometry',5],['vertex',5]]},
+ {t:'calc',kw:[['계산기',6],['계산기 켜',7],['계산해',5],['사칙연산',6],['계산',4],['곱하기',4],['곱해줘',4],['나누기',4],['더하기',4],['더해줘',4],['빼기',4],['얼마야',3],['calculator',6],['calculate',5],['multiply',4],['divide',4],['arithmetic',5]]},
+ {t:'memo',kw:[['음성 메모',7],['음성메모',7],['메모장',5],['메모',4],['메모해',6],['적어둬',5],['적어놔',5],['음성 기록',5],['voice memo',7],['voice note',6],['quick note',6],['memo',5]]},
+ {t:'timetable',kw:[['주간 시간표',9],['주간시간표',9],['시간표 격자',9],['요일별 시간표',9],['요일별시간표',9],['수업 시간표',8],['월화수목금',6],['weekly timetable',9],['weekly schedule',8],['class schedule',7],['timetable grid',9]]},
+ {t:'checklist',kw:[['체크리스트',7],['체크 리스트',7],['준비물',6],['챙길 것',5],['챙겨야',3],['할 일',5],['할일',5],['checklist',7],['check list',7],['packing list',6],['to-do',6],['todo',6],['to do list',6]]},
+ {t:'convert',kw:[['단위 변환',8],['단위변환',8],['변환기',6],['환산',5],['인치로',6],['센티로',6],['센치로',6],['미터로',5],['킬로미터로',6],['마일로',6],['파운드로',6],['화씨로',6],['섭씨로',6],['몇 인치',6],['몇 마일',6],['몇 센티',5],['몇 파운드',6],['unit conversion',8],['convert to',6],['in inches',6],['how many inches',7],['how many miles',7],['to miles',6],['to fahrenheit',6],['to celsius',6],['fahrenheit',4],['celsius',4],['in pounds',6]]},
+ {t:'catalog',kw:[['기능 목록',8],['기능목록',8],['뭐 할 수 있',7],['무엇을 할 수',7],['어떤 기능',6],['무슨 기능',6],['모든 기능',6],['기능 소개',6],['사용법',5],['도움말',6],['명령어',5],['feature list',8],['what can you do',8],['show features',7],['how to use',5],['help',5],['catalog',6]]}
 ];
 function extractItems(req){            // "메뉴: 김치찌개, 된장찌개" / "a, b, c 목록" / "시간표 국어 수학 영어"
   var part=req,m=req.match(/[:：](.+)$/);
@@ -2772,9 +2772,39 @@ function callClaude(userContent){
     return feature;
   });
 }
+/* ── 매처 성장 장치: 미매칭 로그(sd_miss) + AI 슬롯필 결과 학습(sd_learn) ── */
+function learnKey(s){return String(s).toLowerCase().replace(/[\s.,!?~…'"“”‘’]+/g,' ').trim();}
+function learnGet(req){try{var L=JSON.parse(localStorage.getItem('sd_learn')||'{}');return L[learnKey(req)]||null;}catch(e){return null;}}
+function learnPut(req,res){
+  try{
+    var L=JSON.parse(localStorage.getItem('sd_learn')||'{}');
+    L[learnKey(req)]={template:res.template,params:res.params||{},name:res.name||'',tts_intro:res.tts_intro||'',ts:Date.now()};
+    var ks=Object.keys(L);
+    while(ks.length>200){ks.sort(function(a,b){return (L[a].ts||0)-(L[b].ts||0);});delete L[ks.shift()];}   // 오래된 것부터 정리
+    localStorage.setItem('sd_learn',JSON.stringify(L));
+  }catch(e){}
+}
+function missLog(req){
+  try{
+    var M=JSON.parse(localStorage.getItem('sd_miss')||'[]');
+    if(M[M.length-1]!==req)M.push(req);
+    localStorage.setItem('sd_miss',JSON.stringify(M.slice(-100)));
+  }catch(e){}
+}
 function generate(){
   var req=input.value.trim();if(!req)return;
   input.value='';addMsg('user',escapeHtml(req));
+  /* 숨은 점검 명령: 미매칭 로그 열람/비우기 (키워드 사전 보강용 현장 데이터) */
+  if(/^(미매칭|미스 로그|miss ?log|misses)\s*(목록|리스트|보여줘|list)?$/i.test(req)){
+    var M0=[];try{M0=JSON.parse(localStorage.getItem('sd_miss')||'[]');}catch(e){}
+    addMsg('ai','<span class="small">'+(M0.length?tt('로컬 매칭에 실패했던 요청 '+M0.length+'건 (최근순):','Requests that missed local matching ('+M0.length+', recent first):')+'</span><div class="small">'+M0.slice().reverse().map(function(x){return '&middot; '+escapeHtml(x);}).join('<br>'):tt('미매칭 기록이 없습니다.','No misses recorded.')+'</span>')+'</div>');
+    tts(tt('미매칭 요청 '+M0.length+'건이 있습니다. 화면 목록을 확인하세요.','There are '+M0.length+' missed requests. See the list on screen.'));
+    return;
+  }
+  if(/^(미매칭|미스 로그|miss ?log)\s*(삭제|비우기|지워|clear)$/i.test(req)){
+    try{localStorage.removeItem('sd_miss');}catch(e){}
+    addMsg('ai',tt('미매칭 기록을 비웠습니다.','Miss log cleared.'));return;
+  }
 
   function finish(feature,tierMsg){
     contextFeature=feature;
@@ -2813,6 +2843,17 @@ function generate(){
       description:'요청: '+req});
     if(loadFeature(feat)){finish(feat,'[T2] 로컬 매칭(점수 '+m.score+') \u00B7 API 미사용');return;}
   }
+
+  /* ── T2.5: 학습된 요청 재사용 — 과거 AI 슬롯필이 성공한 같은 문장은 오프라인으로 (sd_learn) ── */
+  if(!m||m.needAI){
+    var learned=learnGet(req);
+    if(learned&&TEMPLATES[learned.template]){
+      var lf=specFeature({template:learned.template,params:learned.params||{}},
+        {request:req,name:learned.name||tplDisplayName(learned.template)||learned.template,description:'요청: '+req,tts_intro:learned.tts_intro||''});
+      if(loadFeature(lf)){finish(lf,'[T2.5] 학습된 요청 재사용 \u00B7 API 미사용');return;}
+    }
+  }
+  if(!m)missLog(req);                       // 사전 보강용 미매칭 수집 ("미매칭 목록"으로 열람)
 
   /* ── #8 clarify: 오프라인(API 미설정)에서 템플릿은 잡혔으나 내용이 없는 모호 요청 → 되묻기 ── */
   var hasApi=!!(SD.cfg.api&&SD.cfg.api.trim());
@@ -2873,6 +2914,7 @@ function generate(){
     var feat=specFeature(spec,{request:req,name:res.name||('SPEC: '+res.template),
       description:'요청: '+req,tts_intro:res.tts_intro||''});
     if(!loadFeature(feat))return tier4();
+    learnPut(req,res);                      // 성공한 슬롯필을 학습 — 다음부터 같은 문장은 T2.5 오프라인
     finish(feat,'[T3] AI 슬롯 채우기 \u00B7 약 1/10 토큰');
   }).catch(function(e){
     // 슬롯 호출 자체가 실패(네트워크/미설정): T2 약한 매칭이라도 시도 후 안내
