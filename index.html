@@ -1454,8 +1454,9 @@ vocab:{
  schema:"items:[[단어,뜻]] 배열(필수) · title:팩이름 — 팬 이동, F1 뜻 듣기, F2 한 글자씩, F3 섞기",
  defaults:{title:'단어장',items:[['apple','사과'],['book','책']]},
  run:function(dp,p){
+  if(LANG==='en'&&p.items===TEMPLATES.vocab.defaults.items)p.items=[['apple','a red or green fruit'],['book','pages you read']];
   var items=(p.items||[]).filter(function(it){return it&&it.length>=2&&(''+it[0]).length;}).slice(0,60);
-  if(!items.length)items=[['apple','사과']];
+  if(!items.length)items=[['apple',LANG==='en'?'a fruit':'사과']];
   dp.state.i=0;
   function cur(){return items[dp.state.i];}
   function show(say){
@@ -1482,8 +1483,9 @@ vocab:{
 },
 braille_learn:{
  schema:"mode:'hangul'(자모)|'alpha'(알파벳)|'digit'(숫자) — 팬 이동, F1 점 번호 듣기, F2 다시 읽기, F3 무작위",
- defaults:{mode:'hangul'},
+ defaults:{mode:null},   // 미지정 시 UI 언어로 결정(ko=한글 자모, en=알파벳)
  run:function(dp,p){
+  if(!p.mode)p.mode=(LANG==='en'?'alpha':'hangul');
   var items=[];
   if(p.mode==='alpha'){var ab='abcdefghijklmnopqrstuvwxyz';for(var i=0;i<26;i++)items.push([ab[i].toUpperCase(),ab[i],[BRAILLE[ab[i]]]]);}
   else if(p.mode==='digit'){for(var d=0;d<10;d++){var ch=''+((d+1)%10);items.push([ch,'숫자 '+ch,[NUMSIGN,BRAILLE[DIGITMAP[ch]]]]);}}
@@ -1506,7 +1508,7 @@ braille_learn:{
   }
   function dotsSay(){
    var cells=items[dp.state.i][2],parts=[];
-   for(var ci=0;ci<cells.length;ci++)parts.push(cells[ci].join(', ')+'점');
+   for(var ci=0;ci<cells.length;ci++)parts.push(dp.L(cells[ci].join(', ')+'점','dots '+cells[ci].join(', ')));
    dp.speak(dp.L(parts.join(', 그 다음 칸은 ')+'.', parts.join(', then next cell ')+'.'));
   }
   show(false);
@@ -1687,7 +1689,7 @@ rps:{
  schema:'(파라미터 없음) F1 가위 F2 바위 F3 보',
  defaults:{},
  run:function(dp,p){
-  var names=['가위','바위','보'];
+  var names=(LANG==='en')?['scissors','rock','paper']:['가위','바위','보'];
   function icon(n){dp.clear();
    if(n===0){dp.line(20,8,38,28);dp.line(21,8,39,28);dp.line(38,8,20,28);dp.line(39,8,21,28);}
    else if(n===1){dp.circle(29,18,9,{fill:true});}
@@ -1773,7 +1775,7 @@ caption:{
   dp.onKey(function(k){
    if(k==='F1'){dp.state.txt='';dp.state.tmp='';render();dp.speak(dp.L('자막을 지웠습니다', 'Caption cleared.'));}
    else if(k==='F2'){dp.state.on=!dp.state.on;dp.textLine(dp.state.on?'live caption':'paused');dp.speak(dp.state.on?dp.L('자막 재개','Caption resumed'):dp.L('자막 일시정지','Caption paused'));}
-   else if(k==='F3'){var nl=(dp._listenLang==='en')?'ko':'en';dp.setListenLang(nl);dp.textLine(nl==='en'?'caption EN':'caption KO');dp.speak(nl==='en'?'English recognition':'한국어 인식');}
+   else if(k==='F3'){var nl=(dp._listenLang==='en')?'ko':'en';dp.setListenLang(nl);dp.textLine(nl==='en'?'caption EN':'caption KO');dp.speak(nl==='en'?'English recognition':dp.L('한국어 인식','Korean recognition'));}
   });
  }},
 minutes:{
@@ -1825,7 +1827,7 @@ minutes:{
    var L=dp.state.lines;
    if(k==='F1'){save();}
    else if(k==='F2'){dp.state.on=!dp.state.on;dp.textLine(dp.state.on?'minutes rec':'paused');dp.speak(dp.state.on?dp.L('기록을 재개합니다.','Recording resumed.'):dp.L('일시정지했습니다.','Paused.'));}
-   else if(k==='F3'){var nl=(dp._listenLang==='en')?'ko':'en';dp.setListenLang(nl);dp.textLine(nl==='en'?'minutes EN':'minutes KO');dp.speak(nl==='en'?'English recognition':'한국어 인식');}
+   else if(k==='F3'){var nl=(dp._listenLang==='en')?'ko':'en';dp.setListenLang(nl);dp.textLine(nl==='en'?'minutes EN':'minutes KO');dp.speak(nl==='en'?'English recognition':dp.L('한국어 인식','Korean recognition'));}
    else if(k==='F4'){
     if(!dp.state.lines.length&&!dp.state.tmp){dp.speak(dp.L('지울 내용이 없습니다.','Nothing to clear.'));return;}
     if(!dp.state._delArm){                                  // 실수 방지: 4초 안에 F4 한 번 더 눌러야 삭제
@@ -1857,8 +1859,9 @@ list_nav:{
  schema:'items:문자배열(필수) · title:짧은영문 — 팬 키로 항목 탐색, F1 다시 읽기, F2 처음으로',
  defaults:{title:'list',items:['하나','둘','셋']},
  run:function(dp,p){
+  if(LANG==='en'&&p.items===TEMPLATES.list_nav.defaults.items)p.items=['one','two','three'];
   var items=(p.items||[]).map(String).filter(function(t){return t.length;}).slice(0,40);
-  if(!items.length)items=['항목 없음'];
+  if(!items.length)items=[LANG==='en'?'no items':'항목 없음'];
   dp.state.i=-1;
   function draw(){
    dp.clear();
@@ -1891,6 +1894,7 @@ quiz:{
  run:function(dp,p){
   function loadW(){try{return JSON.parse(localStorage.getItem('sd_wrong')||'[]');}catch(e){return [];}}
   function saveW(list){try{localStorage.setItem('sd_wrong',JSON.stringify(list.slice(-50)));}catch(e){}}
+  if(LANG==='en'&&p.questions===TEMPLATES.quiz.defaults.questions)p.questions=[{q:'What is 1 plus 1?',options:['1','2','3'],answer:1}];
   var review=!!p.review,qs;
   if(review){
    qs=loadW();
@@ -1984,7 +1988,8 @@ text_show:{
  schema:'text:표시할 문장(필수) — 그래픽 멀티라인 점자 + 텍스트 라인 + 음성',
  defaults:{text:'안녕하세요'},
  run:function(dp,p){
-  var t=String(p.text||'안녕하세요');
+  if(LANG==='en'&&p.text===TEMPLATES.text_show.defaults.text)p.text='hello';
+  var t=String(p.text||(LANG==='en'?'hello':'안녕하세요'));
   drawBrailleBlock(dp,t);
   dp.textLine(t);
   dp.onKey(function(k){if(k==='F1')dp.speak(t);});
@@ -2141,14 +2146,15 @@ xlate:{
   dp.onKey(function(k){
    if(k==='F1'){dp.state.txt='';render();dp.speak(dp.L('지웠습니다','Cleared'));}
    else if(k==='F2'){dp.state.on=!dp.state.on;dp.textLine(dp.state.on?label():'paused');dp.speak(dp.state.on?dp.L('재개','Resumed'):dp.L('일시정지','Paused'));}
-   else if(k==='F3'){var nl=(dp._listenLang==='en')?'ko':'en';dp.setListenLang(nl);dp.textLine(nl==='en'?'listen EN':'listen KO');dp.speak(nl==='en'?'English recognition':'한국어 인식');}   // 브라우저 인식은 단일 언어 — 입력 언어 전환(출력은 자동으로 반대)
+   else if(k==='F3'){var nl=(dp._listenLang==='en')?'ko':'en';dp.setListenLang(nl);dp.textLine(nl==='en'?'listen EN':'listen KO');dp.speak(nl==='en'?'English recognition':dp.L('한국어 인식','Korean recognition'));}   // 브라우저 인식은 단일 언어 — 입력 언어 전환(출력은 자동으로 반대)
   });
  }},
 doc:{
  schema:'text:긴 본문(필수) — 점자 페이지 단위 뷰어, 팬으로 페이지 넘김 F1 읽기 F2 처음',
  defaults:{text:'점자 문서 뷰어입니다. 본문을 입력하면 페이지 단위로 점자로 표시하고, 팬 키로 페이지를 넘기며 F1으로 읽어줍니다.'},
  run:function(dp,p){
-  var text=String(p.text||'').trim()||'문서가 비어 있습니다.';
+  if(LANG==='en'&&p.text===TEMPLATES.doc.defaults.text)p.text='This is the braille document viewer. Load text to read it page by page with the pan keys. F1 reads the current page aloud.';
+  var text=String(p.text||'').trim()||(LANG==='en'?'The document is empty.':'문서가 비어 있습니다.');
   var words=text.split(/\s+/),pages=[],cur='';
   for(var w=0;w<words.length;w++){var cand=cur?cur+' '+words[w]:words[w];if(cand.length>72){pages.push(cur);cur=words[w];}else cur=cand;}
   if(cur)pages.push(cur);
@@ -2311,7 +2317,7 @@ memo:{
     M.splice(dp.state.i,1);persist();dp.state.i=Math.min(dp.state.i,M.length-1);
     dp.speak(dp.L('지웠어요. 남은 메모 '+M.length+'개.', 'Deleted. '+M.length+' memos left.'));show(false);
    }
-   else if(k==='F3'){if(!dp.state.rec){dp.speak(dp.L('녹음 중에만 언어를 바꿀 수 있어요.', 'Switch language while recording.'));return;}var nl=(dp._listenLang==='en')?'ko':'en';dp.setListenLang(nl);dp.speak(nl==='en'?'English recognition':'한국어 인식');}
+   else if(k==='F3'){if(!dp.state.rec){dp.speak(dp.L('녹음 중에만 언어를 바꿀 수 있어요.', 'Switch language while recording.'));return;}var nl=(dp._listenLang==='en')?'ko':'en';dp.setListenLang(nl);dp.speak(nl==='en'?'English recognition':dp.L('한국어 인식','Korean recognition'));}
    else if(k==='F4')saveTranscript(dp,M,dp.L('Super Dot 음성 메모','Super Dot Voice Memos'),dp.L('메모-','memo-'));
   });
  }},
@@ -2355,7 +2361,8 @@ timetable:{
  schema:"days:요일 배열(기본 월~금) · rows:[[교시별 요일 과목]] — 주간 시간표 격자. 팬 교시 이동·낭독, F1 다시 읽기, F2 오늘 요일, F3 요약",
  defaults:{days:['월','화','수','목','금'],rows:[['국어','수학','영어','과학','체육'],['수학','국어','음악','영어','미술'],['영어','과학','국어','수학','창체'],['과학','사회','체육','국어','수학']]},
  run:function(dp,p){
-  var days=((p.days&&p.days.length)?p.days:['월','화','수','목','금']).slice(0,7).map(String);
+  if(LANG==='en'&&p.days===TEMPLATES.timetable.defaults.days){p.days=['Mon','Tue','Wed','Thu','Fri'];if(p.rows===TEMPLATES.timetable.defaults.rows)p.rows=[['Math','English','Science','Art','PE'],['English','Math','Music','Science','Art'],['Science','History','Math','English','PE'],['History','PE','English','Math','Music']];}
+  var days=((p.days&&p.days.length)?p.days:(LANG==='en'?['Mon','Tue','Wed','Thu','Fri']:['월','화','수','목','금'])).slice(0,7).map(String);
   var rows=(p.rows||[]).filter(function(r){return r&&r.length;}).slice(0,10).map(function(r){return r.slice(0,days.length).map(String);});
   if(!rows.length)rows=[['국어','수학','영어','과학','체육']];
   var nd=days.length,nr=rows.length;
@@ -2409,8 +2416,9 @@ checklist:{
  schema:"items:항목 배열(필수) · title:제목 — 체크리스트. 팬 이동, F1 체크/해제, F2 진행 상황, F3 모두 해제",
  defaults:{title:'checklist',items:['물통','체육복','실내화']},
  run:function(dp,p){
+  if(LANG==='en'&&p.items===TEMPLATES.checklist.defaults.items)p.items=['water bottle','uniform','shoes'];
   var items=(p.items||[]).map(String).filter(function(t){return t.length;}).slice(0,18);
-  if(!items.length)items=['항목 없음'];
+  if(!items.length)items=[LANG==='en'?'no items':'항목 없음'];
   dp.state.i=-1;dp.state.done=items.map(function(){return false;});
   function draw(){
    dp.clear();
@@ -2777,7 +2785,7 @@ function localMatch(req){
     else needAI=true;                                  // 주제형(경제 용어 등) — AI 콘텐츠 생성
   }
   else if(t==='braille_learn'){
-    params.mode=/알파벳|영어|abc|파닉스|alphabet|phonics|english/i.test(low)?'alpha':(/숫자|digit|number/i.test(low)?'digit':'hangul');
+    params.mode=/알파벳|영어|abc|파닉스|alphabet|phonics|english/i.test(low)?'alpha':(/숫자|digit|number/i.test(low)?'digit':(/한글|자모|hangul|korean/i.test(low)?'hangul':(LANG==='en'?'alpha':'hangul')));
   }
   else if(t==='number_line'){
     var ml=nums.filter(function(x){return x>=-20&&x<=20;}).slice(0,6);
@@ -2977,6 +2985,11 @@ function generate(){
   if(/^(미매칭|미스 로그|miss ?log)\s*(삭제|비우기|지워|clear)$/i.test(req)){
     try{localStorage.removeItem('sd_miss');}catch(e){}
     addMsg('ai',tt('미매칭 기록을 비웠습니다.','Miss log cleared.'));return;
+  }
+  if(/^(학습|learn(ed)?)\s*(삭제|비우기|지워|초기화|clear|reset)$/i.test(req)){   // 오염된 T2.5 학습 초기화
+    try{localStorage.removeItem('sd_learn');}catch(e){}
+    var lm2=tt('학습된 요청을 모두 비웠습니다. 다음 AI 생성부터 다시 학습합니다.','Learned requests cleared. Learning restarts from the next AI generation.');
+    addMsg('ai',lm2);tts(lm2);return;
   }
 
   function finish(feature,tierMsg){
