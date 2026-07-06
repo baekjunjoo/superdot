@@ -183,7 +183,7 @@
   /* == WCAG 2.1 AA & mobile responsive == */
   .skip{position:absolute;left:-9999px;top:0;z-index:200;background:var(--ink);color:#000;padding:12px 18px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:12px}
   .skip:focus{left:0}
-  button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible,[tabindex="0"]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
   .sr-status{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
   @media(pointer:coarse){
     .chip{padding:11px 14px;font-size:11.5px}
@@ -271,7 +271,7 @@
     <div class="col-left">
       <div class="block">
         <div class="block-head"><span data-i18n="build.nli">NATURAL LANGUAGE INPUT</span></div>
-        <div id="chatLog" role="log" aria-live="polite" aria-label="기능 생성 메시지 / Feature builder messages">
+        <div id="chatLog" role="log" aria-live="polite" tabindex="0" aria-label="기능 생성 메시지 / Feature builder messages">
           <div class="msg ai"><span class="ftitle">SUPER DOT</span><br><span data-i18n="build.greet">원하는 기능을 입력하면 DotPad에서 바로 작동하는 기능을 생성합니다.</span><div class="small" data-i18n="build.greetEx">예: "이번 분기 매출을 막대그래프로" &middot; "주사위 굴리기" &middot; "현재 시각을 점자로" &middot; "간단한 미로 게임"</div></div>
         </div>
         <div class="inputArea">
@@ -301,7 +301,7 @@
       <div class="block">
         <div class="block-head"><span data-i18n="lib.title">FEATURE LIBRARY</span><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="openBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.open" aria-label="파일 열기 — .ebrl, .txt, .csv 지원. CSV는 단어장·퀴즈·시간표·목록 자동 판별" data-i18n-aria="lib.openAria">파일 열기</button><button class="btn" id="shareBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.share">SHARE LINK</button><button class="btn" id="importBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.import">IMPORT</button><button class="btn" id="exportBtn" style="padding:5px 12px;font-size:10px" data-i18n="lib.export">EXPORT</button></span></div>
         <input type="file" id="openFile" accept=".ebrl,.txt,.csv" style="display:none" aria-hidden="true" tabindex="-1">
-        <div id="library"><div class="empty" data-i18n="lib.empty">데모 기능이 시뮬레이터에 로드됨</div></div>
+        <div id="library" role="region" tabindex="0" aria-label="기능 라이브러리 목록 / Feature library list"><div class="empty" data-i18n="lib.empty">데모 기능이 시뮬레이터에 로드됨</div></div>
       </div>
     </div>
     <div class="col-right">
@@ -324,7 +324,7 @@
       </div>
       <div class="block" id="console">
         <div class="block-head"><span data-i18n="con.title">TTS &middot; EVENT CONSOLE</span><button class="btn" id="ttsBtn" style="padding:5px 12px;font-size:10px" title="음성 출력 켜기/끄기">TTS ON</button></div>
-        <div id="ttsLog" aria-live="polite"></div>
+        <div id="ttsLog" role="log" aria-live="polite" tabindex="0" aria-label="음성·이벤트 콘솔 / Speech and event console"></div>
         <details id="codeBox" hidden><summary data-i18n="con.code">VIEW RUNTIME CODE</summary><pre id="codeView"></pre></details>
       </div>
     </div>
