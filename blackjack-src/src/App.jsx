@@ -1,6 +1,6 @@
-/* App.jsx — 셀(사이드바+톱바, 레퍼런스 스타일) + 라우팅(로비/방/연습)
+/* App.jsx — 셸(사이드바+톱바) + 라우팅(로비/방/연습)
    시각장애인(웹+닷패드) + 비장애인(웹) 크로스 플레이
-   설정: 음성/속도/짧은 안내/언어(한국어·English — 닷패드 점자 표기)/효과음, 닉네임·ID 영속화 */
+   설정: 음성/속도/짧은 안내/발화 스킵/언어(한국어·English)/효과음, 닉네임·ID·방설정 영속화 */
 import React, { useCallback, useState } from 'react';
 import Lobby from './ui/Lobby.jsx';
 import Room from './ui/Room.jsx';
@@ -20,6 +20,7 @@ export default function App() {
   const [tts, setTts] = useState(true);
   const [ttsRate, setTtsRate] = useState(prefs.ttsRate);
   const [quietOthers, setQuietOthers] = useState(prefs.quietOthers);
+  const [skipSpeech, setSkipSpeech] = useState(prefs.skipSpeech);
   const [lang, setLang] = useState(prefs.lang || (prefs.brailleKo ? 'ko' : 'en'));
   const [sfxOn, setSfxOn] = useState(prefs.sfx);
   const [log, setLog] = useState([]);
@@ -51,7 +52,10 @@ export default function App() {
     say(isHost ? '방을 만드는 중…' : '방에 입장하는 중…');
     try {
       const transport = await makeTransport(code, mode);
-      const client = createRoomClient({ transport, me, isHost, say });
+      const client = createRoomClient({
+        transport, me, isHost, say,
+        engineOpts: isHost ? { ...getPrefs().roomOpts } : {}   // 호스트: 저장된 방 설정으로 시작
+      });
       await client.join();
       setView({ name: 'room', code, mode, isHost, me, client });
       say((isHost ? '방이 만들어졌습니다. 초대 코드 ' : '입장했습니다. 방 코드 ') + code.split('').join(' ') +
@@ -84,7 +88,7 @@ export default function App() {
         <div className="sidebar-settings" role="group" aria-label="설정">
           <button
             aria-pressed={tts}
-            onClick={() => { const v = !tts; setTts(v); setSpeechEnabled(v); say('음성 안내 ' + (v ? '켜' : '끔')); }}>
+            onClick={() => { const v = !tts; setTts(v); setSpeechEnabled(v); say('음성 안내 ' + (v ? '켬' : '끔')); }}>
             음성 {tts ? 'ON' : 'OFF'}
           </button>
           <label className="setting-row">
@@ -101,8 +105,14 @@ export default function App() {
           <button
             aria-pressed={quietOthers}
             title="다른 플레이어의 카드·차례 발화를 생략 (로그에는 표시)"
-            onClick={() => { const v = !quietOthers; setQuietOthers(v); setPref('quietOthers', v); say('짧은 안내 ' + (v ? '켜. 다른 사람 진행은 생략합니다.' : '끔')); }}>
+            onClick={() => { const v = !quietOthers; setQuietOthers(v); setPref('quietOthers', v); say('짧은 안내 ' + (v ? '켬. 다른 사람 진행은 생략합니다.' : '끔')); }}>
             짧은 안내 {quietOthers ? 'ON' : 'OFF'}
+          </button>
+          <button
+            aria-pressed={skipSpeech}
+            title="키를 누르면 진행 중이던 음성을 끊고 바로 다음으로 (숙련자용)"
+            onClick={() => { const v = !skipSpeech; setSkipSpeech(v); setPref('skipSpeech', v); say('발화 스킵 ' + (v ? '켬. 키를 누르면 이전 음성을 끊습니다.' : '끔')); }}>
+            발화 스킵 {skipSpeech ? 'ON' : 'OFF'}
           </button>
           <label className="setting-row">
             <span>언어</span>
@@ -120,7 +130,7 @@ export default function App() {
           </label>
           <button
             aria-pressed={sfxOn}
-            onClick={() => { const v = !sfxOn; setSfxOn(v); setPref('sfx', v); say('효과음 ' + (v ? '켜' : '끔')); }}>
+            onClick={() => { const v = !sfxOn; setSfxOn(v); setPref('sfx', v); say('효과음 ' + (v ? '켬' : '끔')); }}>
             효과음 {sfxOn ? 'ON' : 'OFF'}
           </button>
         </div>
