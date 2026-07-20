@@ -191,7 +191,7 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
       p.insDecided = p.chips < Math.ceil(p.bet / 2); // 칩 부족하면 자동 패스 처리
       if (p.insDecided) A('보험을 걸 칩이 부족해 자동 패스합니다.', p.id);
     });
-    A('딜러 오픈 카드가 에이스입니다. 보험을 거시겠어요? 에프원 보험(베팅의 절반), 에프투 패스.');
+    A('딜러 오픈 카드가 에이스입니다. 보험은 딜러가 블랙잭일 때만 돌려받는 추가 베팅이에요. 잘 모르겠으면 에프투 패스를 누르세요. 에프원 보험(베팅의 절반), 에프투 패스.');
     if (allInsDecided()) return resolveInsurance();
     emit();
   }
@@ -394,7 +394,7 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
     /* 전 국면 공통 */
     if (act === 'status') return statusFor(id);
     if (act === 'rules') {
-      A('블랙잭 규칙. 21에 가까우면 승리, 넘으면 버스트. 에이스는 1 또는 11. 딜러는 16 이하 히트, 17 스탠드. 블랙잭은 1.5배. 같은 숫자 두 장은 스플릿 가능.', id);
+      A('블랙잭 규칙. 21에 가까우면 승리, 넘으면 버스트. 에이스는 1 또는 11. 딜러는 16 이하 히트, 17 스탠드. 블랙잭은 1.5배. 같은 숫자 두 장은 스플릿 가능. 딜러 오픈이 에이스면 보험을 걸 수 있는데, 딜러가 블랙잭일 때만 돌려받아요. 모르면 패스해도 됩니다.', id);
       return;
     }
     if (act === 'emote') {
