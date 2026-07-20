@@ -10,8 +10,9 @@ export const IMG = {
   cards:  { local: './img/tile-cards.webp',  cdn: CDN + 'hf_20260720_014959_15a0f02e-ee95-4202-8bab-b355270891d3_min.webp' },
   trophy: { local: './img/tile-trophy.webp', cdn: CDN + 'hf_20260720_015001_b64eadc8-3192-4f00-8a56-98f3224cf49a_min.webp' },
   dotpad: { local: './img/tile-dotpad.webp', cdn: CDN + 'hf_20260720_023103_f4ed9987-8cd2-4173-8427-988eb42bcce3_min.webp' },
-  /* v4 게임룸 (포커 테이블 스타일) */
+  /* v4~v5 게임룸 (포커 테이블 스타일) */
   cardback:  { local: './img/cardback.webp',  cdn: CDN + 'hf_20260720_043553_59e0d734-1e89-4269-9558-8b7ce7906547_min.webp' },
+  tablefelt: { local: './img/tablefelt.webp', cdn: CDN + 'hf_20260720_045609_d29accea-91cd-42ba-9792-9c08af91f4a0_min.webp' },
   dealerbot: { local: './img/av-dealer.webp', cdn: CDN + 'hf_20260720_043552_5d3ffcef-9c3f-4766-9606-d275fb4a0429_min.webp' },
   av0: { local: './img/av-bear.webp',   cdn: CDN + 'hf_20260720_043229_e8213d32-437d-4c74-b153-d0a13afd6705_min.webp' },
   av1: { local: './img/av-rabbit.webp', cdn: CDN + 'hf_20260720_043231_80858034-fbf9-40f6-8e94-954bd4e7e45a_min.webp' },

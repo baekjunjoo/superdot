@@ -12,6 +12,7 @@ const FILES = {
   'tile-trophy.webp': 'hf_20260720_015001_b64eadc8-3192-4f00-8a56-98f3224cf49a_min.webp',
   'tile-dotpad.webp': 'hf_20260720_023103_f4ed9987-8cd2-4173-8427-988eb42bcce3_min.webp',
   'cardback.webp': 'hf_20260720_043553_59e0d734-1e89-4269-9558-8b7ce7906547_min.webp',
+  'tablefelt.webp': 'hf_20260720_045609_d29accea-91cd-42ba-9792-9c08af91f4a0_min.webp',
   'av-dealer.webp': 'hf_20260720_043552_5d3ffcef-9c3f-4766-9606-d275fb4a0429_min.webp',
   'av-bear.webp': 'hf_20260720_043229_e8213d32-437d-4c74-b153-d0a13afd6705_min.webp',
   'av-rabbit.webp': 'hf_20260720_043231_80858034-fbf9-40f6-8e94-954bd4e7e45a_min.webp',
