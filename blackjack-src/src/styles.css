@@ -54,7 +54,7 @@ body {
 .pill-active { background: var(--accent); color: #fff; font-weight: 700; }
 .topbar-nick { font-size: 13px; color: var(--muted); }
 .spacer { flex: 1; }
-main { padding: 20px; max-width: 1120px; width: 100%; margin: 0 auto; }
+main { padding: 20px; max-width: 1560px; width: 100%; margin: 0 auto; }
 
 /* ── 공용 버튼 ── */
 button {
@@ -168,6 +168,22 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 .pcard-backmark { color: var(--accent); position: relative; }
 .pcard-backimg:not([style*="display: none"]) + .pcard-backmark { display: none; }
 
+/* ── 3단 배치: 닷패드(좌) · 테이블(중앙) · 로그(우) ── */
+.room-grid {
+  display: grid; grid-template-columns: 300px minmax(0, 1fr) 300px;
+  gap: 14px; align-items: start;
+}
+.rg-left, .rg-right { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.rg-center { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.dotpad-vert { flex-direction: column; align-items: stretch; }
+.dotpad-vert canvas { width: 100%; height: auto; }
+.dotpad-vert .textline { min-width: 0; }
+.rg-log { height: 560px; max-height: none; }
+@media (max-width: 1180px) {
+  .room-grid { grid-template-columns: 1fr; }
+  .rg-log { height: auto; max-height: 200px; }
+}
+
 /* ── 포커 테이블 스테이지 ── */
 .pk-stage {
   position: relative;
@@ -176,13 +192,18 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 }
 .pk-table {
   position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%);
-  width: min(72%, 640px); height: 320px;
+  width: min(76%, 680px); height: 340px;
   background: linear-gradient(180deg, #1e1e26, #191920);
-  border: 2px solid #2e2e38; border-radius: 170px;
+  border: 2px solid #2e2e38; border-radius: 180px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  overflow: hidden;
+}
+.pk-felt {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; border-radius: inherit; opacity: 0.9;
 }
 .pk-rail {
-  position: absolute; inset: 14px; border: 2px solid #34343f; border-radius: 160px;
+  position: absolute; inset: 14px; border: 2px solid #34343f; border-radius: 170px;
   pointer-events: none;
 }
 .pk-dealer-zone { display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 1; }
@@ -197,16 +218,16 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 /* 아바타 */
 .pk-avatar-wrap { position: relative; display: inline-block; }
 .pk-avatar {
-  width: 56px; height: 56px; border-radius: 50%; object-fit: cover;
+  width: 80px; height: 80px; border-radius: 50%; object-fit: cover;
   border: 3px solid #34343c; background: var(--panel2); display: block;
 }
-.pk-avatar-dealer { width: 44px; height: 44px; }
+.pk-avatar-dealer { width: 68px; height: 68px; }
 .pk-turn .pk-avatar { border-color: var(--accent); animation: pk-ring 1.1s ease-in-out infinite; }
 .pk-turn-tag { position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); white-space: nowrap; }
 
 /* 좌석 (다른 플레이어) — 테이블 주변 배치 */
 .pk-seat {
-  position: absolute; width: 132px;
+  position: absolute; width: 140px;
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   text-align: center; z-index: 2;
 }
@@ -243,7 +264,7 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
   max-width: 90%;
 }
 .pk-me-head { display: flex; align-items: center; gap: 10px; }
-.pk-me .pk-avatar { width: 64px; height: 64px; }
+.pk-me .pk-avatar { width: 96px; height: 96px; }
 .pk-me .pk-seat-info { text-align: left; }
 .pk-me-hands { display: flex; gap: 18px; align-items: flex-end; }
 .pk-my-hand { display: flex; flex-direction: column; align-items: center; gap: 4px; }
