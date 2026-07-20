@@ -15,6 +15,7 @@ const DEFAULTS = {
   lang: 'en',           // 언어 설정: 'ko'(한국어) | 'en'(English) — 닷패드 점자 표기 기준
   brailleKo: false,     // (구버전 호환 필드)
   sfx: true,            // 효과음 (TTS와 분리)
+  seenTutorial: false,  // 첫 진입 튜토리얼(게임 방법) 안내 여부
   roomOpts: { turnTimeout: 30000, dealerDelay: 900, scoreMode: false }, // 방 기본 설정(호스트)
   stats: { games: 0, wins: 0, blackjacks: 0, bestChips: 0, today: '', todayGames: 0, todayWins: 0 }
 };
@@ -47,7 +48,7 @@ export function setPref(key, val) {
 }
 
 /* 라운드 결과 기록 (outcome: blackjack|win|push|lose|bust, chips: 현재 보유)
-   누적 + 오늘 성적(날짜 바뀌면 리셋) */
+   누적 + 오늘 성적(날짜 바뀜면 리셋) */
 export function recordResult(outcome, chips) {
   const p = getPrefs();
   const today = new Date().toISOString().slice(0, 10);

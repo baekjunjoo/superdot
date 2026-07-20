@@ -33,6 +33,8 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
   const stRef = useRef(st);
   const prevPhase = useRef(null);
   const logRef = useRef(null);
+  const actionsRef = useRef(null);      // 조작 버튼 영역 (포커스 복구용)
+  const prevMyTurn = useRef(false);
 
   useEffect(() => {
     client.onStateChange = (s) => { stRef.current = s; setSt(s); };
@@ -137,6 +139,23 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
       }
       prevPhase.current = s.phase;
     }
+
+    /* 포커스 유실 방지:
+       (a) 방금 포커한 버튼이 국면 전환으로 disabled 되면 다음 유효 버튼(없으면 영역)으로 이동
+       (b) 내 차례가 새로 시작되면 첫 유효 버튼으로 포커스를 옮겨 SR/키보드 사용자가 바로 조작 */
+    const box = actionsRef.current;
+    const myTurnNow = s.phase === 'acting' && s.turnId === me.id;
+    if (box) {
+      const el = document.activeElement;
+      const focusInside = el && box.contains(el);
+      const becmeMyTurn = myTurnNow && !prevMyTurn.current;
+      if ((focusInside && el.disabled) || becmeMyTurn) {
+        const nextBtn = box.querySelector('button:not([disabled])');
+        if (nextBtn) nextBtn.focus();
+        else if (focusInside && el.disabled) box.focus();
+      }
+    }
+    prevMyTurn.current = myTurnNow;
   }, [st, me.id]);
 
   /* 로그 자동 스크롤: 신규는 아래에 쌓이고 최신으로 이동. 단, 사용자가 위로 스크롤해
@@ -276,6 +295,7 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
         <>
           <button className="btn-primary pk-big-btn" onClick={() => client.sendAction('insure')} disabled={decided}>보험 (F1)</button>
           <button className="pk-big-btn" onClick={() => client.sendAction('pass')} disabled={decided}>패스 (F2)</button>
+          <span className="wait-note ins-help">보험은 딜러가 블랙잭일 때만 돌려받는 추가 베팅이에요. 잘 모르면 패스(F2).</span>
           {decided && <span className="wait-note">다른 플레이어 대기 중…</span>}
         </>
       );
@@ -430,14 +450,14 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
         )}
       </div>
 
-      <section className="controls pk-actions" aria-label="게임 조작">
+      <section className="controls pk-actions" aria-label="게임 조작" ref={actionsRef} tabIndex={-1}>
         {controls()}
         <button onClick={() => client.sendAction('status')}>상태 읽기 (F4)</button>
       </section>
 
       <section className="emotes" aria-label="이모트 (키보드 5~9, 0)">
-        {EMOTES.map((tx, i) => (
-          <button key={i} onClick={() => { sfx.emote(); client.sendAction('emote', i); }}>{tx}</button>
+        {EMOTES.map((t, i) => (
+          <button key={i} onClick={() => { sfx.emote(); client.sendAction('emote', i); }}>{t}</button>
         ))}
       </section>
         </div>
