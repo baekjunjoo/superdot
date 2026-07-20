@@ -175,17 +175,18 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 /* ── 3단 배치: 닷패드(좌) · 테이블(중앙) · 로그(우) ── */
 .room-grid {
   display: grid; grid-template-columns: 300px minmax(0, 1fr) 300px;
-  gap: 14px; align-items: start;
+  gap: 14px; align-items: stretch;
 }
 .rg-left, .rg-right { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .rg-center { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .dotpad-vert { flex-direction: column; align-items: stretch; }
 .dotpad-vert canvas { width: 100%; height: auto; }
 .dotpad-vert .textline { min-width: 0; }
-.rg-log { height: 560px; max-height: none; }
+/* 로그 창을 테이블(센터 컴럼) 높이만큼 늘림 */
+.rg-right .rg-log { flex: 1; height: auto; max-height: none; min-height: 400px; }
 @media (max-width: 1180px) {
   .room-grid { grid-template-columns: 1fr; }
-  .rg-log { height: auto; max-height: 200px; }
+  .rg-right .rg-log { flex: none; height: auto; min-height: 0; max-height: 200px; }
 }
 
 /* ── 포커 테이블 스테이지 ── */
@@ -261,15 +262,15 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
   font-size: 11px; color: var(--muted); z-index: 2;
 }
 
-/* 내 자리 (하단 중앙) */
+/* 내 자리 (하단 중앙) — 아바타를 카드 왼쪽에 배치해 시야 가림 없음 */
 .pk-me {
   position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 3;
-  max-width: 90%;
+  display: flex; flex-direction: row; align-items: flex-end; gap: 18px; z-index: 3;
+  max-width: 94%;
 }
-.pk-me-head { display: flex; align-items: center; gap: 10px; }
+.pk-me-head { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .pk-me .pk-avatar { width: 96px; height: 96px; }
-.pk-me .pk-seat-info { text-align: left; }
+.pk-me .pk-seat-info { text-align: center; }
 .pk-me-hands { display: flex; gap: 18px; align-items: flex-end; }
 .pk-my-hand { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .pk-big-btn { min-width: 130px; font-size: 15px; }
