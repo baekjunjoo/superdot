@@ -1,6 +1,6 @@
 /* render.js — 게임 상태 → 촉각 프레임(60×40) + 텍스트라인(20셀)
    레이아웃: 위 = 딜러, 아래 = 플레이어, 가운데 점선 구분선 (인트로 음성으로 안내)
-   카드 = 11×16 외곽선 + 굵은 랭크 글리프. 딜러 홀카드 = X 패턴
+   카드 = 11×16 외곽선 + 랭크 글리프(2배 — 획 사이 틈으로 구분 쉬움). 딜러 홀카드 = X 패턴
    칩 게이지 = 화면 제일 하단(기준선 y34 + 막대 y36~39) */
 
 import { createFrame, clearBuf, rect, line, dashedHLine, drawGlyph, drawText, textWidth, encodeRows, W } from './frame.js';
@@ -8,7 +8,7 @@ import { strToTextCells } from './braille-core.js';
 import { handValue } from '../game/blackjack.js';
 import { getPrefs } from '../prefs.js';
 
-/* 카드 크게(11×16), 랭크 굵게(가로 3배·세로 2배) — 촉각 가독성 우선 */
+/* 카드 크게(11×16) — 촉각 가독성 우선 */
 const CARD_W = 11, CARD_H = 16, PITCH = 12;
 const DEALER_Y = 1, PLAYER_Y = 22, DIVIDER_Y = 19;
 const GAUGE_BASE_Y = 34, GAUGE_BAR_Y = 36;      // 칩 게이지: 화면 제일 하단
@@ -25,8 +25,8 @@ function drawCard(buf, x, y, card, hidden) {
     drawGlyph(buf, '1', x + 2, y + 3, 1, 2);
     drawGlyph(buf, '0', x + 6, y + 3, 1, 2);
   } else {
-    // 한 자리: 가로 3배·세로 2배(9×10) — 굵은 획으로 손끝 인식 향상
-    drawGlyph(buf, card.r, x + 1, y + 3, 3, 2);
+    // 한 자리: 가로·세로 2배(6×10) — 획 사이 틈이 있어 형태 구분이 쉬움 ('10'과 동일 톤)
+    drawGlyph(buf, card.r, x + 2, y + 3, 2, 2);
   }
 }
 
