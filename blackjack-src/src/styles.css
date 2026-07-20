@@ -1,4 +1,4 @@
-/* Tactile Blackjack — 레퍼런스 스타일 (다크 카지노), 메인 컴러 #ea5414, 글로우 없음 */
+/* Tactile Blackjack — 레퍼런스 스타일 (다크 카지노), 메인 컬러 #ea5414, 글로우 없음 */
 :root {
   color-scheme: dark;
   --accent: #ea5414;
@@ -182,7 +182,7 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 .dotpad-vert { flex-direction: column; align-items: stretch; }
 .dotpad-vert canvas { width: 100%; height: auto; }
 .dotpad-vert .textline { min-width: 0; }
-/* 로그 창을 테이블(센터 컴럼) 높이만큼 늘림 */
+/* 로그 창을 테이블(센터 컬럼) 높이만큼 늘림 */
 .rg-right .rg-log { flex: 1; height: auto; max-height: none; min-height: 400px; }
 @media (max-width: 1180px) {
   .room-grid { grid-template-columns: 1fr; }
@@ -342,6 +342,18 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 .stats-row strong { color: var(--accent); }
 .stats-today { color: var(--text); font-weight: 600; }
 .host-settings-note { font-size: 11px; color: var(--muted); margin-left: auto; }
+
+/* 하이·로우 스테이지 */
+.hl-stage {
+  position: relative; overflow: hidden;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 20px;
+  min-height: 320px; padding: 24px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+}
+.hl-felt { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.5; }
+.hl-card-wrap { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; }
+.hl-card-wrap .pcard-lg { width: 88px; height: 124px; font-size: 42px; }
+.hl-prompt { position: relative; z-index: 1; color: var(--text); font-size: 16px; margin: 0; }
 
 .dotpad-panel {
   display: flex; gap: 14px; align-items: stretch; flex-wrap: wrap;
