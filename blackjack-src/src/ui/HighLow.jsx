@@ -37,7 +37,7 @@ export default function HighLow({ say, log, onLeave }) {
       }
     });
     game.start();
-    return () => { unsub(); BLE.frameProvider = null; BLE.onKeyHandler = null; };
+    return () => { unsub(); BLE.frameProvider = null; BLE.onKeyHandler = null; BLE.onStatus = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

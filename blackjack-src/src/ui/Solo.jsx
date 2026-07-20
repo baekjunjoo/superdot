@@ -39,7 +39,7 @@ export default function Solo({ say, log, onLeave }) {
     };
     const unsub = game.subscribe(() => { BLE.requestFlush(); force((n) => n + 1); });
     game.intro();
-    return () => { unsub(); BLE.frameProvider = null; BLE.onKeyHandler = null; };
+    return () => { unsub(); BLE.frameProvider = null; BLE.onKeyHandler = null; BLE.onStatus = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -120,8 +120,8 @@ export default function Solo({ say, log, onLeave }) {
       </div>
 
       <p className="hint">키보드: 1~4 = F1~F4, ←/→ = 팬</p>
-      <section aria-label="안내 로그" className="log log-scroll" aria-live="polite">
-        {log.slice(-30).map((l, i) => <div key={i}>{l}</div>)}
+      <section aria-label="안내 로그" className="log" aria-live="polite">
+        {log.slice(-8).map((l, i) => <div key={i}>{l}</div>)}
       </section>
     </div>
   );
