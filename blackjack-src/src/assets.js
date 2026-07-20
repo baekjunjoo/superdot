@@ -15,7 +15,7 @@ export const IMG = {
   dealerbot: { local: './img/av-dealer.webp', cdn: CDN + 'hf_20260720_043552_5d3ffcef-9c3f-4766-9606-d275fb4a0429_min.webp' },
   av0: { local: './img/av-bear.webp',   cdn: CDN + 'hf_20260720_043229_e8213d32-437d-4c74-b153-d0a13afd6705_min.webp' },
   av1: { local: './img/av-rabbit.webp', cdn: CDN + 'hf_20260720_043231_80858034-fbf9-40f6-8e94-954bd4e7e45a_min.webp' },
-  av2: { local: './img/av-tiger.webp',  cdn: CDN + 'hf_20260720_043232_4670fc09-678a-4707-947f-269076d6d0d0_min.webp' },
+  av2: { local: './img/av-tiger.webp',  cdn: CDN + 'hf_20260720_043232_4670fc09-678a-4707-947f-269076d6dbd0_min.webp' },
   av3: { local: './img/av-fox.webp',    cdn: CDN + 'hf_20260720_043234_74ad7845-496d-4e32-a1e0-214dc66e21e7_min.webp' },
   av4: { local: './img/av-cat.webp',    cdn: CDN + 'hf_20260720_043235_9912acb5-233a-4436-8b67-a7e3b792a830_min.webp' },
   av5: { local: './img/av-dog.webp',    cdn: CDN + 'hf_20260720_043245_630bb4a7-dc04-4300-9cb2-20e142b5e288_min.webp' },

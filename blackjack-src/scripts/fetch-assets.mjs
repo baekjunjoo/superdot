@@ -15,7 +15,7 @@ const FILES = {
   'av-dealer.webp': 'hf_20260720_043552_5d3ffcef-9c3f-4766-9606-d275fb4a0429_min.webp',
   'av-bear.webp': 'hf_20260720_043229_e8213d32-437d-4c74-b153-d0a13afd6705_min.webp',
   'av-rabbit.webp': 'hf_20260720_043231_80858034-fbf9-40f6-8e94-954bd4e7e45a_min.webp',
-  'av-tiger.webp': 'hf_20260720_043232_4670fc09-678a-4707-947f-269076d6d0d0_min.webp',
+  'av-tiger.webp': 'hf_20260720_043232_4670fc09-678a-4707-947f-269076d6dbd0_min.webp',
   'av-fox.webp': 'hf_20260720_043234_74ad7845-496d-4e32-a1e0-214dc66e21e7_min.webp',
   'av-cat.webp': 'hf_20260720_043235_9912acb5-233a-4436-8b67-a7e3b792a830_min.webp',
   'av-dog.webp': 'hf_20260720_043245_630bb4a7-dc04-4300-9cb2-20e142b5e288_min.webp',
