@@ -1,5 +1,7 @@
-/* Room.jsx — 멀티플레이 게임룸 (포커 테이블 스타일 + 3단 배치)
-   좌: 닷패드 출력 / 중앙: 테이블 / 우: 안내 로그. 발화 스킵 + 방설정 자동저장 + 인슈어런스 */
+/* Room.jsx — 멀티플레이 게임룸 v4 (포커 테이블 스타일)
+   중앙 오벌 테이블(딜러 카드) + 좌석 배치(힙스필드 아바타) + 하단 액션 바
+   애니메이션: 카드 딜 스태거/홀카드 플립, 차례 펄스 링, 결과 배지 팝, 이모트 말풍선
+   시각장애인: 닷패드(F1~F4/팬) + 음성 / 비시각장애인: 화면 + 버튼·키보드 (기능 동일) */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import BLE from '../dotpad/ble.js';
 import { renderRoom, roomStatusText } from '../dotpad/render.js';
@@ -16,6 +18,7 @@ import { AVATARS, IMG, imgFallback } from '../assets.js';
 const PHASE_KO = { lobby: '대기실', betting: '베팅', insurance: '보험', acting: '플레이', dealer: '딜러 차례', result: '결과' };
 const RESULT_KO = { blackjack: '블랙잭', win: '승리', push: '무승부', lose: '패배', bust: '버스트' };
 
+/* 플레이어 ID → 아바타 인덱스 (세션 내 고정) */
 function avatarIdx(id) {
   let n = 0;
   for (const ch of String(id)) n = (n + ch.charCodeAt(0)) % 997;
@@ -25,7 +28,7 @@ function avatarIdx(id) {
 export default function Room({ client, me, isHost, code, mode, say, log, onLeave }) {
   const [st, setSt] = useState(client.state);
   const [bleStatus, setBleStatus] = useState('연결 안 됨');
-  const [bubbles, setBubbles] = useState({});
+  const [bubbles, setBubbles] = useState({});   // nick → {text, t}
   const canvasRef = useRef(null);
   const stRef = useRef(st);
   const prevPhase = useRef(null);
@@ -39,6 +42,7 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
 
   const amHost = isHost || client.isHostNow;
 
+  /* 이모트 말풍선: 로그 마지막 항목 "닉: 문구" 감지 */
   useEffect(() => {
     const last = log[log.length - 1];
     const s = stRef.current;
@@ -49,14 +53,17 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
     const known = s.players.some((p) => p.nick === nick) || (s.spectators || []).some((x) => x.nick === nick);
     if (!known) return;
     setBubbles((b) => ({ ...b, [nick]: { text: m[2], t: Date.now() } }));
-    const timer = setTimeout(() => { setBubbles((b) => { const c = { ...b }; delete c[nick]; return c; }); }, 3000);
+    const timer = setTimeout(() => {
+      setBubbles((b) => { const c = { ...b }; delete c[nick]; return c; });
+    }, 3000);
     return () => clearTimeout(timer);
   }, [log]);
 
+  /* 닷패드/키 → 국면별 액션 매핑 */
   const onGameKey = useCallback((k) => {
     const s = stRef.current;
     if (!s) return;
-    skipCurrent();
+    skipCurrent();   // 발화 스킵 설정 시 진행 중 음성을 끊고 즉시 반응
     if (k === 'F4') return client.sendAction('status');
     if (s.phase === 'lobby') {
       if (k === 'F1' && amHost) return client.sendAction('start');
@@ -89,6 +96,7 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
     return client.sendAction('status');
   }, [client, amHost]);
 
+  /* BLE 배선 */
   useEffect(() => {
     BLE.frameProvider = () => {
       const s = stRef.current;
@@ -109,9 +117,10 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
       say(msg);
       if (codeMsg === 'connected') client.sendAction('status');
     };
-    return () => { BLE.frameProvider = null; BLE.onKeyHandler = null; };
+    return () => { BLE.frameProvider = null; BLE.onKeyHandler = null; BLE.onStatus = null; };
   }, [onGameKey, me.id, say, client]);
 
+  /* 상태 변경 시에만 → 닷패드 push + 미리보기 + 전적/효과음 (버블/BLE상태 리렌더에는 미실행) */
   useEffect(() => {
     BLE.requestFlush();
     drawPreview();
@@ -128,15 +137,19 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
       }
       prevPhase.current = s.phase;
     }
-    /* 신규 로그는 아래에 쌓이고 자동으로 최신 위치로 이동. 단, 사용자가 위로 스크롤해
-       과거 로그를 보는 중이면(하단에서 60px 이상 떨어짐) 강제로 내리지 않음. */
+  }, [st, me.id]);
+
+  /* 로그 자동 스크롤: 신규는 아래에 쌓이고 최신으로 이동. 단, 사용자가 위로 스크롤해
+     과거 로그를 보는 중이면(하단에서 60px 이상 떨어짐) 강제로 내리지 않음. */
+  useEffect(() => {
     const el = logRef.current;
     if (el) {
       const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
       if (nearBottom) el.scrollTop = el.scrollHeight;
     }
-  });
+  }, [log]);
 
+  /* 키보드: 1~4 = F키, ←/→ = 팬, 5~9/0 = 이모트 */
   useEffect(() => {
     const onKeyDown = (e) => {
       if (e.altKey || e.ctrlKey || e.metaKey) return;
@@ -175,7 +188,9 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
     );
   }
 
-  if (st === undefined) { return <div className="room-closed"><p>방에 접속하는 중…</p></div>; }
+  if (st === undefined) {
+    return <div className="room-closed"><p>방에 접속하는 중…</p></div>;
+  }
   if (st === null) {
     return (
       <div className="room-closed">
@@ -198,6 +213,7 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
     meP.cards.length === 2 && meP.cards[0].r === meP.cards[1].r && meP.chips >= meP.bet;
   const inRound = st.phase === 'acting' || st.phase === 'dealer' || st.phase === 'result';
 
+  /* 좌석 렌더 (다른 플레이어) */
   function seat(p, slot) {
     const turn = st.phase === 'acting' && st.turnId === p.id;
     const hands = p.hands && p.hands.length ? p.hands : [p.cards];
@@ -232,6 +248,7 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
     );
   }
 
+  /* 국면별 조작 버튼 */
   function controls() {
     if (amSpectator) return <p className="wait-note">관전 중 — 자리가 나면 자동으로 참가합니다. 이모트와 F4 상태 읽기를 쓸 수 있어요.</p>;
     if (st.phase === 'lobby') {
@@ -287,6 +304,7 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
     return <p className="wait-note">딜러가 카드를 뽑는 중…</p>;
   }
 
+  /* 호스트 방 설정 */
   function hostSettings() {
     if (!amHost) return null;
     const o = st.opts || {};
@@ -336,6 +354,7 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
 
       {hostSettings()}
 
+      {/* ── 3단 배치: 닷패드(좌) · 테이블(중앙) · 로그(우) ── */}
       <div className="room-grid">
         <aside className="rg-left" aria-label="닷패드 출력">
           <div className="dotpad-panel dotpad-vert">
@@ -352,6 +371,7 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
         </aside>
 
         <div className="rg-center">
+      {/* ── 포커 테이블 스테이지 ── */}
       <div className="pk-stage" aria-label="게임 테이블">
         <div className="pk-table">
           <img className="pk-felt" src={IMG.tablefelt.local} alt="" onError={imgFallback('tablefelt')} aria-hidden="true" />
@@ -370,6 +390,7 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
 
         {others.map((p, i) => seat(p, i % 7))}
 
+        {/* 내 자리 (하단 중앙) */}
         {meP && (
           <div className={'pk-me' + (myTurn ? ' pk-turn' : '')}>
             {bubbles[meP.nick] && <div className="pk-bubble" role="status">{bubbles[meP.nick].text}</div>}
@@ -415,8 +436,8 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
       </section>
 
       <section className="emotes" aria-label="이모트 (키보드 5~9, 0)">
-        {EMOTES.map((t, i) => (
-          <button key={i} onClick={() => { sfx.emote(); client.sendAction('emote', i); }}>{t}</button>
+        {EMOTES.map((tx, i) => (
+          <button key={i} onClick={() => { sfx.emote(); client.sendAction('emote', i); }}>{tx}</button>
         ))}
       </section>
         </div>
