@@ -128,7 +128,13 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
       }
       prevPhase.current = s.phase;
     }
-    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+    /* 신규 로그는 아래에 쌓이고 자동으로 최신 위치로 이동. 단, 사용자가 위로 스크롤해
+       과거 로그를 보는 중이면(하단에서 60px 이상 떨어짐) 강제로 내리지 않음. */
+    const el = logRef.current;
+    if (el) {
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+      if (nearBottom) el.scrollTop = el.scrollHeight;
+    }
   });
 
   useEffect(() => {
