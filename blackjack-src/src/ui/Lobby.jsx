@@ -15,6 +15,7 @@ export default function Lobby({ nick, setNick, onCreate, onJoin, onSolo, prefill
 
   const stats = getPrefs().stats;
   const winRate = stats.games ? Math.round((stats.wins / stats.games) * 100) : 0;
+  const todayRate = stats.todayGames ? Math.round((stats.todayWins / stats.todayGames) * 100) : 0;
 
   return (
     <div className="lobby">
@@ -49,8 +50,9 @@ export default function Lobby({ nick, setNick, onCreate, onJoin, onSolo, prefill
       <section className="my-stats" aria-label="내 기록">
         <h3 className="section-title"><span className="accent">●</span> 내 기록</h3>
         <div className="stats-row">
-          <span>플레이 <strong>{stats.games}</strong>판</span>
-          <span>승률 <strong>{winRate}%</strong></span>
+          <span className="stats-today">오늘 <strong>{stats.todayGames}</strong>판 · 승률 <strong>{todayRate}%</strong></span>
+          <span>누적 <strong>{stats.games}</strong>판</span>
+          <span>전체 승률 <strong>{winRate}%</strong></span>
           <span>블랙잭 <strong>{stats.blackjacks}</strong>회</span>
           <span>최고 칩 <strong>{stats.bestChips}</strong></span>
         </div>
