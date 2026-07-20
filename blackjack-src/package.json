@@ -1,0 +1,22 @@
+{
+  "name": "dotpad-blackjack",
+  "private": true,
+  "version": "3.0.0",
+  "type": "module",
+  "description": "DotPad 촉각 블랙잭 — Tactile Worlds Dot Games용 (60x40 그래픽 + 20셀 점자 텍스트라인 + F1~F4/팬 키)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node test/logic.test.mjs && node test/dotpad-sim.mjs && node test/table.test.mjs && node test/v3.test.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.0"
+  }
+}
