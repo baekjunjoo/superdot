@@ -325,7 +325,9 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 }
 
 .controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.controls:focus, .pk-actions:focus { outline: none; }
 .wait-note { color: var(--muted); font-size: 14px; margin: 8px 0; }
+.ins-help { flex-basis: 100%; text-align: center; margin: 4px 0 0; }
 
 .host-settings {
   display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
@@ -345,6 +347,18 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 .seat-hand { border-radius: 8px; padding: 3px; }
 .seat-hand-active { outline: 2px solid var(--accent); }
 .seat-spectators { opacity: 0.7; }
+
+/* 게임 방법 튜토리얼 패널 */
+.tutorial {
+  background: var(--panel); border: 1px solid var(--accent); border-radius: 14px;
+  padding: 16px 18px; margin-bottom: 20px;
+}
+.tutorial-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.tutorial-head .section-title { margin: 0; }
+.tutorial-actions { display: flex; gap: 8px; }
+.tutorial-actions button { min-height: 38px; padding: 6px 14px; font-size: 13px; }
+.tutorial-steps { margin: 10px 0 0; padding-left: 22px; line-height: 1.7; color: var(--text); }
+.tutorial-steps li { margin-bottom: 6px; }
 
 .my-stats { margin-bottom: 20px; }
 .stats-row {
