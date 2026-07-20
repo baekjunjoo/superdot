@@ -50,15 +50,18 @@ export function dealerShouldHit(cards) {
 
 /* 정산. delta = 칩 증감 (베팅은 이미 차감된 상태 기준: 반환액 - 0)
    반환값 outcome: blackjack | win | push | lose | bust
-   payout: 라운드 종료 시 플레이어에게 돌려줄 칩(베팅 포함) */
-export function settle({ bet, player, dealer }) {
+   payout: 라운드 종료 시 플레이어에게 돌려줄 칩(베팅 포함)
+   playerNatural: 스플릿하지 않은 원 핸드만 '내추럴 블랙잭'(1.5배) 인정.
+     스플릿 후 두 장 21은 일반 승리로 처리한다. */
+export function settle({ bet, player, dealer, playerNatural = true }) {
   const pv = handValue(player).total;
   const dv = handValue(dealer).total;
+  const pBJ = playerNatural && isBlackjack(player);
+  const dBJ = isBlackjack(dealer);
   if (pv > 21) return { outcome: 'bust', payout: 0 };
-  if (isBlackjack(player) && !isBlackjack(dealer)) {
-    return { outcome: 'blackjack', payout: bet + Math.floor(bet * 1.5) };
-  }
-  if (isBlackjack(dealer) && !isBlackjack(player)) return { outcome: 'lose', payout: 0 };
+  if (pBJ && !dBJ) return { outcome: 'blackjack', payout: bet + Math.floor(bet * 1.5) };
+  if (dBJ && pBJ) return { outcome: 'push', payout: bet };
+  if (dBJ && !pBJ) return { outcome: 'lose', payout: 0 };
   if (dv > 21) return { outcome: 'win', payout: bet * 2 };
   if (pv > dv) return { outcome: 'win', payout: bet * 2 };
   if (pv < dv) return { outcome: 'lose', payout: 0 };
