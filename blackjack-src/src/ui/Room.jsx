@@ -1,6 +1,6 @@
 /* Room.jsx — 멀티플레이 게임룸 v5 (포커 테이블 스타일 + 3단 배치)
-   좌: 닷패드 출력 / 중앙: 테이블(힉스필드 폠트) / 우: 안내 로그 — 세로 스크롤 최소화
-   애니메이션: 카드 딜 스태거/홀카드 플립, 차례 펄스 링, 결과 배지 팝, 이모트 말풍선 */
+   좌: 닷패드 출력 / 중앙: 테이블(힉스필드 폰트) / 우: 안내 로그 — 세로 스크롤 최소화
+   발화 스킵(설정) + 방 설정 자동저장 */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import BLE from '../dotpad/ble.js';
 import { renderRoom, roomStatusText } from '../dotpad/render.js';
@@ -9,7 +9,8 @@ import { handValue } from '../game/blackjack.js';
 import { EMOTES } from '../game/table.js';
 import { HandView } from './CardView.jsx';
 import { W, H } from '../dotpad/frame.js';
-import { recordResult } from '../prefs.js';
+import { recordResult, saveRoomOpt } from '../prefs.js';
+import { skipCurrent } from '../speech.js';
 import { sfx } from '../sfx.js';
 import { AVATARS, IMG, imgFallback } from '../assets.js';
 
@@ -61,6 +62,7 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
   const onGameKey = useCallback((k) => {
     const s = stRef.current;
     if (!s) return;
+    skipCurrent();   // 발화 스킵 설정 시 진행 중 음성을 끊고 즉시 반응
     if (k === 'F4') return client.sendAction('status');
     if (s.phase === 'lobby') {
       if (k === 'F1' && amHost) return client.sendAction('start');
@@ -275,14 +277,14 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
     return <p className="wait-note">딜러가 카드를 뽑는 중…</p>;
   }
 
-  /* 호스트 방 설정 */
+  /* 호스트 방 설정 (자동 저장) */
   function hostSettings() {
     if (!amHost) return null;
     const o = st.opts || {};
     return (
       <div className="host-settings" role="group" aria-label="방 설정 (호스트)">
         <label>턴 제한
-          <select value={o.turnTimeout} onChange={(e) => client.sendAction('set', { key: 'turnTimeout', value: parseInt(e.target.value, 10) })}>
+          <select value={o.turnTimeout} onChange={(e) => { const v = parseInt(e.target.value, 10); client.sendAction('set', { key: 'turnTimeout', value: v }); saveRoomOpt('turnTimeout', v); }}>
             <option value={0}>없음</option>
             <option value={15000}>15초</option>
             <option value={30000}>30초</option>
@@ -290,7 +292,7 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
           </select>
         </label>
         <label>딜러 속도
-          <select value={o.dealerDelay} onChange={(e) => client.sendAction('set', { key: 'dealerDelay', value: parseInt(e.target.value, 10) })}>
+          <select value={o.dealerDelay} onChange={(e) => { const v = parseInt(e.target.value, 10); client.sendAction('set', { key: 'dealerDelay', value: v }); saveRoomOpt('dealerDelay', v); }}>
             <option value={500}>빠름</option>
             <option value={900}>보통</option>
             <option value={1500}>천천히</option>
@@ -299,9 +301,10 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
         <button
           aria-pressed={!!o.scoreMode}
           title="수업용: 칩·베팅을 점수로 표시"
-          onClick={() => client.sendAction('set', { key: 'scoreMode', value: !o.scoreMode })}>
+          onClick={() => { const v = !o.scoreMode; client.sendAction('set', { key: 'scoreMode', value: v }); saveRoomOpt('scoreMode', v); }}>
           점수 모드 {o.scoreMode ? 'ON' : 'OFF'}
         </button>
+        <span className="host-settings-note">설정은 자동 저장돼요</span>
       </div>
     );
   }
