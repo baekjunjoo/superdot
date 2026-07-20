@@ -1,10 +1,9 @@
-/* Lobby.jsx — 레퍼런스 스타일 로비 (사이드바 + 히어로 + 게임 타일)
-   이미지: 힉스필드 생성 (assets.js — 로컬 우선, CDN 폴백) */
+/* Lobby.jsx — 레퍼런스 스타일 로비 (사이드바 + 히어로 + 게임 타일) */
 import React, { useState } from 'react';
 import { IMG, imgFallback } from '../assets.js';
 import { getPrefs } from '../prefs.js';
 
-export default function Lobby({ nick, setNick, onCreate, onJoin, onSolo, prefillCode }) {
+export default function Lobby({ nick, setNick, onCreate, onJoin, onSolo, onHighLow, prefillCode }) {
   const [code, setCode] = useState(prefillCode || '');
   const [mode, setMode] = useState('online'); // online | local
 
@@ -70,11 +69,11 @@ export default function Lobby({ nick, setNick, onCreate, onJoin, onSolo, prefill
           <img src={IMG.chips.local} alt="" onError={imgFallback('chips')} />
           <span className="tile-cta">혼자 연습</span>
         </button>
-        <div className="tile tile-disabled" aria-disabled="true">
-          <div className="tile-head"><strong>RANK</strong><span>랭킹</span></div>
-          <img src={IMG.trophy.local} alt="" onError={imgFallback('trophy')} />
-          <span className="tile-cta">준비 중</span>
-        </div>
+        <button className="tile" onClick={onHighLow}>
+          <div className="tile-head"><strong>HI·LO</strong><span>하이·로우</span></div>
+          <img src={IMG.cardback.local} alt="" onError={imgFallback('cardback')} />
+          <span className="tile-cta">혼자 즐기기</span>
+        </button>
         <div className="tile tile-info">
           <div className="tile-head"><strong>DOTPAD</strong><span>닷패드 지원</span></div>
           <img src={IMG.dotpad.local} alt="" onError={imgFallback('dotpad')} />

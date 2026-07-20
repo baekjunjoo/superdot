@@ -1,10 +1,11 @@
-/* App.jsx — 셸(사이드바+톱바) + 라우팅(로비/방/연습)
+/* App.jsx — 셸(사이드바+톱바) + 라우팅(로비/방/연습/하이로우)
    시각장애인(웹+닷패드) + 비장애인(웹) 크로스 플레이
    설정: 음성/속도/짧은 안내/발화 스킵/언어(한국어·English)/효과음, 닉네임·ID·방설정 영속화 */
 import React, { useCallback, useState } from 'react';
 import Lobby from './ui/Lobby.jsx';
 import Room from './ui/Room.jsx';
 import Solo from './ui/Solo.jsx';
+import HighLow from './ui/HighLow.jsx';
 import { createRoomClient } from './net/client.js';
 import { supabaseTransport, localTransport, makeRoomCode } from './net/transport.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
@@ -27,7 +28,6 @@ export default function App() {
 
   const setNick = (v) => { setNickState(v); setPref('nick', v); };
 
-  /* kind==='others'(다른 플레이어 진행)는 짧은 안내 모드에서 음성 생략(로그엔 남음) */
   const say = useCallback((txt, kind) => {
     if (!(kind === 'others' && getPrefs().quietOthers)) speak(txt);
     setLog((l) => [...l.slice(-99), txt]);
@@ -54,7 +54,7 @@ export default function App() {
       const transport = await makeTransport(code, mode);
       const client = createRoomClient({
         transport, me, isHost, say,
-        engineOpts: isHost ? { ...getPrefs().roomOpts } : {}   // 호스트: 저장된 방 설정으로 시작
+        engineOpts: isHost ? { ...getPrefs().roomOpts } : {}
       });
       await client.join();
       setView({ name: 'room', code, mode, isHost, me, client });
@@ -145,7 +145,7 @@ export default function App() {
           <div className="pills">
             <span className={'pill' + (view.name === 'lobby' ? ' pill-active' : '')}>홈</span>
             <span className={'pill' + (view.name === 'room' ? ' pill-active' : '')}>게임룸</span>
-            <span className={'pill' + (view.name === 'solo' ? ' pill-active' : '')}>연습</span>
+            <span className={'pill' + (view.name === 'solo' || view.name === 'highlow' ? ' pill-active' : '')}>혼자</span>
           </div>
           <span className="spacer" />
           <span className="topbar-nick">{nick}</span>
@@ -159,7 +159,11 @@ export default function App() {
               onCreate={(mode) => enterRoom(makeRoomCode(), mode, true)}
               onJoin={(code, mode) => enterRoom(code, prefillCode === code ? prefillMode : mode, false)}
               onSolo={() => setView({ name: 'solo' })}
+              onHighLow={() => setView({ name: 'highlow' })}
             />
+          )}
+          {view.name === 'highlow' && (
+            <HighLow say={say} log={log} onLeave={() => setView({ name: 'lobby' })} />
           )}
           {view.name === 'room' && (
             <Room
