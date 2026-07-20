@@ -1,6 +1,6 @@
-/* App.jsx — 셸(사이드바+톱바) + 라우팅(로비/방/연습/하이로우)
+/* App.jsx — 셸(사이드바+톱바, 레퍼런스 스타일) + 라우팅(로비/방/연습)
    시각장애인(웹+닷패드) + 비장애인(웹) 크로스 플레이
-   설정: 음성/속도/짧은 안내/발화 스킵/언어(한국어·English)/효과음, 닉네임·ID·방설정 영속화 */
+   v3: 설정(발화 속도·짧은 안내·한국 점자·효과음), 닉네임/ID 영속화(재접속 복구) */
 import React, { useCallback, useState } from 'react';
 import Lobby from './ui/Lobby.jsx';
 import Room from './ui/Room.jsx';
@@ -28,6 +28,7 @@ export default function App() {
 
   const setNick = (v) => { setNickState(v); setPref('nick', v); };
 
+  /* kind==='others'(다른 플레이어 진행)는 짧은 안내 모드에서 음성 생략(로그어 남음) */
   const say = useCallback((txt, kind) => {
     if (!(kind === 'others' && getPrefs().quietOthers)) speak(txt);
     setLog((l) => [...l.slice(-99), txt]);
@@ -54,12 +55,12 @@ export default function App() {
       const transport = await makeTransport(code, mode);
       const client = createRoomClient({
         transport, me, isHost, say,
-        engineOpts: isHost ? { ...getPrefs().roomOpts } : {}
+        engineOpts: isHost ? { ...getPrefs().roomOpts } : {}   // 호스트: 저장된 방 설정으로 시작
       });
       await client.join();
       setView({ name: 'room', code, mode, isHost, me, client });
       say((isHost ? '방이 만들어졌습니다. 초대 코드 ' : '입장했습니다. 방 코드 ') + code.split('').join(' ') +
-        (isHost ? '. 초대 링크 복사 버튼으로 친구를 부르세요. 에프1로 게임 시작.' : '.'));
+        (isHost ? '. 초대 링크 복사 버튼으로 친구를 부르세요. 에프원로 게임 시작.' : '.'));
     } catch (e) {
       say('입장 실패: ' + (e && e.message ? e.message : '알 수 없는 오류'));
     }
@@ -88,7 +89,7 @@ export default function App() {
         <div className="sidebar-settings" role="group" aria-label="설정">
           <button
             aria-pressed={tts}
-            onClick={() => { const v = !tts; setTts(v); setSpeechEnabled(v); say('음성 안내 ' + (v ? '켬' : '끔')); }}>
+            onClick={() => { const v = !tts; setTts(v); setSpeechEnabled(v); say('음성 안내 ' + (v ? '콀' : '끓')); }}>
             음성 {tts ? 'ON' : 'OFF'}
           </button>
           <label className="setting-row">
@@ -105,13 +106,13 @@ export default function App() {
           <button
             aria-pressed={quietOthers}
             title="다른 플레이어의 카드·차례 발화를 생략 (로그에는 표시)"
-            onClick={() => { const v = !quietOthers; setQuietOthers(v); setPref('quietOthers', v); say('짧은 안내 ' + (v ? '켬. 다른 사람 진행은 생략합니다.' : '끔')); }}>
+            onClick={() => { const v = !quietOthers; setQuietOthers(v); setPref('quietOthers', v); say('짧은 안내 ' + (v ? '콀. 다른 사람 진행은 생략합니다.' : '끓')); }}>
             짧은 안내 {quietOthers ? 'ON' : 'OFF'}
           </button>
           <button
             aria-pressed={skipSpeech}
             title="키를 누르면 진행 중이던 음성을 끊고 바로 다음으로 (숙련자용)"
-            onClick={() => { const v = !skipSpeech; setSkipSpeech(v); setPref('skipSpeech', v); say('발화 스킵 ' + (v ? '켬. 키를 누르면 이전 음성을 끊습니다.' : '끔')); }}>
+            onClick={() => { const v = !skipSpeech; setSkipSpeech(v); setPref('skipSpeech', v); say('발화 스킵 ' + (v ? '콀. 키를 누르면 이전 음성을 끊습니다.' : '끓')); }}>
             발화 스킵 {skipSpeech ? 'ON' : 'OFF'}
           </button>
           <label className="setting-row">
@@ -130,7 +131,7 @@ export default function App() {
           </label>
           <button
             aria-pressed={sfxOn}
-            onClick={() => { const v = !sfxOn; setSfxOn(v); setPref('sfx', v); say('효과음 ' + (v ? '켬' : '끔')); }}>
+            onClick={() => { const v = !sfxOn; setSfxOn(v); setPref('sfx', v); say('효과음 ' + (v ? '콀' : '끓')); }}>
             효과음 {sfxOn ? 'ON' : 'OFF'}
           </button>
         </div>
@@ -145,7 +146,7 @@ export default function App() {
           <div className="pills">
             <span className={'pill' + (view.name === 'lobby' ? ' pill-active' : '')}>홈</span>
             <span className={'pill' + (view.name === 'room' ? ' pill-active' : '')}>게임룸</span>
-            <span className={'pill' + (view.name === 'solo' || view.name === 'highlow' ? ' pill-active' : '')}>혼자</span>
+            <span className={'pill' + (view.name === 'solo' ? ' pill-active' : '')}>연습</span>
           </div>
           <span className="spacer" />
           <span className="topbar-nick">{nick}</span>
@@ -154,7 +155,7 @@ export default function App() {
         <main>
           {view.name === 'lobby' && (
             <Lobby
-              nick={nick} setNick={setNick}
+              nick={nick} setNick={setNick} say={say}
               prefillCode={prefillCode}
               onCreate={(mode) => enterRoom(makeRoomCode(), mode, true)}
               onJoin={(code, mode) => enterRoom(code, prefillCode === code ? prefillMode : mode, false)}
