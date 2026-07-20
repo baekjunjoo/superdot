@@ -93,8 +93,12 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 .hero-art { flex: 0.8; display: flex; align-items: center; justify-content: center; min-width: 0; }
 .hero-art img { max-width: 100%; max-height: 240px; border-radius: 12px; }
 
+/* 로비 콘텐츠 폭: 게임 타일 4열 기준으로 히어로·내 기록·게임 섹션 정렬 */
+.lobby { max-width: 1000px; margin: 0 auto; }
 .section-title { display: flex; align-items: center; gap: 8px; font-size: 18px; margin: 0 0 12px; }
-.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 900px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .tiles { grid-template-columns: 1fr; } }
 .tile {
   display: flex; flex-direction: column; gap: 8px; text-align: left;
   background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px;
