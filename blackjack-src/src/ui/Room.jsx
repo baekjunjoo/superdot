@@ -1,7 +1,7 @@
-/* Room.jsx — 멀티플레이 게임룸 v3
-   시각장애인: 닷패드(F1~F4/팬) + 음성. 비시각장애인: 화면 + 버튼/키보드.
-   v3: 스플릿(팬 오른쪽), 이모트(숫자 5~0), 관전 모드, 호스트 방 설정(턴 타이머/딜러 속도/점수 모드),
-       전적 기록 + 효과음 + 모바일 진동, NVDA 포커스 모드 힌트, 로그 전체 스크롤 */
+/* Room.jsx — 멀티플레이 게임룸 v4 (포커 테이블 스타일)
+   중앙 오벌 테이블(딜러 카드) + 좌석 배치(힉스필드 아바타) + 하단 액션 바
+   애니메이션: 카드 딜 스태거/홀카드 플립, 차례 펄스 링, 결과 배지 팝, 이모트 말풍선
+   시각장애인: 닷패드(F1~F4/팬) + 음성 / 비시각장애인: 화면 + 버튼·키보드 (기능 동일) */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import BLE from '../dotpad/ble.js';
 import { renderRoom, roomStatusText } from '../dotpad/render.js';
@@ -12,13 +12,22 @@ import { HandView } from './CardView.jsx';
 import { W, H } from '../dotpad/frame.js';
 import { recordResult } from '../prefs.js';
 import { sfx } from '../sfx.js';
+import { AVATARS, IMG, imgFallback } from '../assets.js';
 
 const PHASE_KO = { lobby: '대기실', betting: '베팅', acting: '플레이', dealer: '딜러 차례', result: '결과' };
 const RESULT_KO = { blackjack: '블랙잭', win: '승리', push: '무승부', lose: '패배', bust: '버스트' };
 
+/* 플레이어 ID → 아바타 인덱스 (세션 내 고정) */
+function avatarIdx(id) {
+  let n = 0;
+  for (const ch of String(id)) n = (n + ch.charCodeAt(0)) % 997;
+  return n % AVATARS.length;
+}
+
 export default function Room({ client, me, isHost, code, mode, say, log, onLeave }) {
   const [st, setSt] = useState(client.state);
   const [bleStatus, setBleStatus] = useState('연결 안 됨');
+  const [bubbles, setBubbles] = useState({});   // nick → {text, t}
   const canvasRef = useRef(null);
   const stRef = useRef(st);
   const prevPhase = useRef(null);
@@ -31,6 +40,23 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
   }, [client]);
 
   const amHost = isHost || client.isHostNow;
+
+  /* 이모트 말풍선: 로그 마지막 항목 "닉: 문구" 감지 */
+  useEffect(() => {
+    const last = log[log.length - 1];
+    const s = stRef.current;
+    if (!last || !s) return;
+    const m = last.match(/^(.+?): (.+)$/);
+    if (!m) return;
+    const nick = m[1];
+    const known = s.players.some((p) => p.nick === nick) || (s.spectators || []).some((x) => x.nick === nick);
+    if (!known) return;
+    setBubbles((b) => ({ ...b, [nick]: { text: m[2], t: Date.now() } }));
+    const timer = setTimeout(() => {
+      setBubbles((b) => { const c = { ...b }; delete c[nick]; return c; });
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [log]);
 
   /* 닷패드/키 → 국면별 액션 매핑 */
   const onGameKey = useCallback((k) => {
@@ -162,19 +188,55 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
   const CHIP = score ? '점수' : '칩';
   const BET = score ? '점수' : '베팅';
   const meP = st.players.find((p) => p.id === me.id);
+  const others = st.players.filter((p) => p.id !== me.id);
   const amSpectator = !meP && st.spectators && st.spectators.some((s) => s.id === me.id);
   const myTurn = st.phase === 'acting' && st.turnId === me.id;
   const dealerShown = st.dealer.filter((c) => !c.hidden);
   const dealerTotal = dealerShown.length ? handValue(dealerShown).total : 0;
   const canSplitNow = meP && myTurn && meP.hands && meP.hands.length === 1 &&
     meP.cards.length === 2 && meP.cards[0].r === meP.cards[1].r && meP.chips >= meP.bet;
+  const inRound = st.phase === 'acting' || st.phase === 'dealer' || st.phase === 'result';
+
+  /* 좌석 렌더 (다른 플레이어) */
+  function seat(p, slot) {
+    const turn = st.phase === 'acting' && st.turnId === p.id;
+    const hands = p.hands && p.hands.length ? p.hands : [p.cards];
+    const av = AVATARS[avatarIdx(p.id)];
+    return (
+      <div key={p.id} className={`pk-seat pk-pos-${slot}${turn ? ' pk-turn' : ''}`}>
+        {bubbles[p.nick] && <div className="pk-bubble" role="status">{bubbles[p.nick].text}</div>}
+        <div className="pk-avatar-wrap">
+          <img className="pk-avatar" src={av.local} alt="" onError={imgFallback(av.key)} />
+          {turn && <span className="badge badge-turn pk-turn-tag">차례</span>}
+        </div>
+        <div className="pk-seat-info">
+          <strong>{p.nick}</strong>
+          <span className="pk-chips">{CHIP} {p.chips}</span>
+        </div>
+        {st.phase !== 'lobby' && (
+          <div className="pk-bet-badge" aria-label={BET + ' ' + p.bet}>
+            <span className="pk-chip-icon" aria-hidden="true" />{p.bet}
+            {st.phase === 'betting' && (p.betConfirmed ? ' ✓' : ' …')}
+          </div>
+        )}
+        {hands.map((h, hi) => (
+          <div key={hi} className="pk-mini-hand">
+            <HandView cards={h || []} size="sm" label={p.nick + ' 카드' + (hands.length > 1 ? ' ' + (hi + 1) : '')} />
+            {p.results && p.results[hi] && <span className={'badge pk-pop badge-' + p.results[hi]}>{RESULT_KO[p.results[hi]]}</span>}
+          </div>
+        ))}
+        {p.sitOut && <span className="pk-sitout">관전</span>}
+        {st.phase === 'result' && p.ready && <span className="pk-sitout">준비✓</span>}
+      </div>
+    );
+  }
 
   /* 국면별 조작 버튼 */
   function controls() {
     if (amSpectator) return <p className="wait-note">관전 중 — 자리가 나면 자동으로 참가합니다. 이모트와 F4 상태 읽기를 쓸 수 있어요.</p>;
     if (st.phase === 'lobby') {
       return amHost
-        ? <button className="btn-primary" onClick={() => client.sendAction('start')}>게임 시작 (F1)</button>
+        ? <button className="btn-primary pk-big-btn" onClick={() => client.sendAction('start')}>게임 시작 (F1)</button>
         : <p className="wait-note">호스트가 시작하기를 기다리는 중…</p>;
     }
     if (st.phase === 'betting') {
@@ -182,7 +244,7 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
       return (
         <>
           <button onClick={() => client.sendAction('bet-')} disabled={meP && meP.betConfirmed}>◀ {BET}</button>
-          <button className="btn-primary" onClick={() => client.sendAction('confirm')} disabled={meP && meP.betConfirmed}>
+          <button className="btn-primary pk-big-btn" onClick={() => client.sendAction('confirm')} disabled={meP && meP.betConfirmed}>
             {BET} {meP ? meP.bet : ''} 확정 (F1)
           </button>
           <button onClick={() => client.sendAction('bet+')} disabled={meP && meP.betConfirmed}>{BET} ▶</button>
@@ -193,8 +255,8 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
     if (st.phase === 'acting') {
       return (
         <>
-          <button className="btn-primary" onClick={() => client.sendAction('hit')} disabled={!myTurn}>히트 (F1)</button>
-          <button onClick={() => client.sendAction('stand')} disabled={!myTurn}>스탠드 (F2)</button>
+          <button className="btn-primary pk-big-btn" onClick={() => client.sendAction('hit')} disabled={!myTurn}>히트 (F1)</button>
+          <button className="pk-big-btn" onClick={() => client.sendAction('stand')} disabled={!myTurn}>스탠드 (F2)</button>
           <button onClick={() => client.sendAction('double')} disabled={!myTurn}>더블다운 (F3)</button>
           <button onClick={() => client.sendAction('split')} disabled={!canSplitNow} title="같은 숫자 두 장일 때 (팬 오른쪽)">스플릿 (팬▶)</button>
         </>
@@ -204,7 +266,7 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
       const allBroke = st.players.length && st.players.every((p) => p.chips <= 0);
       return (
         <>
-          <button className="btn-primary" onClick={() => client.sendAction('ready')} disabled={meP && (meP.ready || meP.chips <= 0)}>
+          <button className="btn-primary pk-big-btn" onClick={() => client.sendAction('ready')} disabled={meP && (meP.ready || meP.chips <= 0)}>
             다음 판 준비 (F1)
           </button>
           {amHost && allBroke && <button onClick={() => client.sendAction('newgame')}>새 게임 ({CHIP} 리셋)</button>}
@@ -245,6 +307,9 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
     );
   }
 
+  const myAv = AVATARS[avatarIdx(me.id)];
+  const myHands = meP && meP.hands && meP.hands.length ? meP.hands : (meP ? [meP.cards] : []);
+
   return (
     <div className="room">
       <div className="room-top">
@@ -260,54 +325,64 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
 
       {hostSettings()}
 
-      <section className="dealer-area" aria-label={'딜러 카드, 합계 ' + dealerTotal}>
-        <div className="area-label">딜러 {st.dealer.length > 0 && <em>{dealerTotal}{st.hideHole ? '+?' : ''}</em>}</div>
-        <HandView cards={st.dealer} size="lg" label="딜러 카드" />
-      </section>
+      {/* ── 포커 테이블 스테이지 ── */}
+      <div className="pk-stage" aria-label="게임 테이블">
+        <div className="pk-table">
+          <div className="pk-rail" aria-hidden="true" />
+          <div className="pk-dealer-zone" aria-label={'딜러 카드, 합계 ' + dealerTotal}>
+            <div className="pk-dealer-head">
+              <img className="pk-avatar pk-avatar-dealer" src={IMG.dealerbot.local} alt="" onError={imgFallback('dealerbot')} />
+              <span className="pk-dealer-label">딜러 {st.dealer.length > 0 && <em>{dealerTotal}{st.hideHole ? '+?' : ''}</em>}</span>
+            </div>
+            <HandView cards={st.dealer} size="lg" label="딜러 카드" />
+          </div>
+          <div className="pk-pot" aria-hidden="true">
+            {st.phase === 'lobby' ? '대기실 · ' + st.players.length + '명' : st.round + 'R · ' + PHASE_KO[st.phase]}
+          </div>
+        </div>
 
-      <section className="seats" aria-label="플레이어">
-        {st.players.map((p) => {
-          const turn = st.phase === 'acting' && st.turnId === p.id;
-          const hands = p.hands && p.hands.length ? p.hands : [p.cards];
-          return (
-            <div key={p.id} className={'seat' + (turn ? ' seat-turn' : '') + (p.id === me.id ? ' seat-me' : '')}>
-              <div className="seat-head">
-                <strong>{p.nick}{p.id === me.id ? ' (나)' : ''}</strong>
-                <span className="seat-chips">{CHIP} {p.chips}</span>
+        {others.map((p, i) => seat(p, i % 7))}
+
+        {/* 내 자리 (하단 중앙) */}
+        {meP && (
+          <div className={'pk-me' + (myTurn ? ' pk-turn' : '')}>
+            {bubbles[meP.nick] && <div className="pk-bubble" role="status">{bubbles[meP.nick].text}</div>}
+            <div className="pk-me-head">
+              <div className="pk-avatar-wrap">
+                <img className="pk-avatar" src={myAv.local} alt="" onError={imgFallback(myAv.key)} />
+                {myTurn && <span className="badge badge-turn pk-turn-tag">내 차례</span>}
               </div>
-              <div className="seat-bet">
-                {BET} {p.bet}
-                {st.phase === 'betting' && (p.betConfirmed ? ' ✓확정' : ' …')}
-                {p.sitOut && ' · 관전'}
-                {st.phase === 'result' && p.ready && ' · 준비✓'}
+              <div className="pk-seat-info">
+                <strong>{meP.nick} (나)</strong>
+                <span className="pk-chips">{CHIP} {meP.chips} · {BET} {meP.bet}
+                  {st.phase === 'betting' && (meP.betConfirmed ? ' ✓' : '')}
+                  {st.phase === 'result' && meP.ready && ' · 준비✓'}
+                </span>
               </div>
-              {hands.map((h, hi) => {
+            </div>
+            <div className="pk-me-hands">
+              {inRound && myHands.map((h, hi) => {
                 const v = h && h.length ? handValue(h).total : null;
-                const res = p.results && p.results[hi];
+                const res = meP.results && meP.results[hi];
                 return (
-                  <div key={hi} className={'seat-hand' + (hands.length > 1 && p.activeHand === hi && turn ? ' seat-hand-active' : '')}>
-                    <HandView cards={h || []} size="sm" label={p.nick + ' 카드' + (hands.length > 1 ? ' ' + (hi + 1) : '')} />
+                  <div key={hi} className={'pk-my-hand' + (myHands.length > 1 && meP.activeHand === hi && myTurn ? ' seat-hand-active' : '')}>
+                    <HandView cards={h || []} size="lg" label={'내 카드' + (myHands.length > 1 ? ' ' + (hi + 1) : '')} />
                     <div className="seat-status">
                       {v != null && <span>합계 {v}</span>}
-                      {res && <span className={'badge badge-' + res}>{RESULT_KO[res]}</span>}
-                      {!res && p.result && hands.length === 1 && <span className={'badge badge-' + p.result}>{RESULT_KO[p.result]}</span>}
-                      {turn && hi === p.activeHand && <span className="badge badge-turn">차례</span>}
+                      {res && <span className={'badge pk-pop badge-' + res}>{RESULT_KO[res]}</span>}
                     </div>
                   </div>
                 );
               })}
             </div>
-          );
-        })}
-        {st.spectators && st.spectators.length > 0 && (
-          <div className="seat seat-spectators">
-            <div className="seat-head"><strong>관전</strong><span className="seat-chips">{st.spectators.length}명</span></div>
-            <div className="seat-bet">{st.spectators.map((s) => s.nick).join(', ')}</div>
           </div>
         )}
-      </section>
+        {st.spectators && st.spectators.length > 0 && (
+          <div className="pk-spectators">관전 {st.spectators.length}명 · {st.spectators.map((s) => s.nick).join(', ')}</div>
+        )}
+      </div>
 
-      <section className="controls" aria-label="게임 조작">
+      <section className="controls pk-actions" aria-label="게임 조작">
         {controls()}
         <button onClick={() => client.sendAction('status')}>상태 읽기 (F4)</button>
       </section>
