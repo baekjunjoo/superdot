@@ -60,7 +60,7 @@ t.ok('텍스트라인 규격 (lineId 0, hex 40자)', txt().length > 0 && txt().e
 const expectBet = textLineHex('bet 25 chips 100');
 t.ok('텍스트라인 점형 일치 (bet 25 chips 100)', txt()[txt().length - 1].hex === expectBet, txt()[txt().length - 1].hex);
 let rows = sim.deviceState();
-t.ok('베팅 화면: 칩 게이지 표시', pixel(rows, 5, 30) && pixel(rows, 5, 33));
+t.ok('베팅 화면: 칩 게이지 제일 하단 (기준선 y34 + 막대 y36~39)', pixel(rows, 5, 34) && pixel(rows, 5, 37) && pixel(rows, 5, 39));
 
 clearInterval(BLE._ka); BLE._ka = null;
 
@@ -81,10 +81,10 @@ sim.fireKey('KeyFunction1'); await wait(600);
 t.ok('F1 배분: 플레이어 차례', game.state.phase === 'player');
 t.ok('칩 차감 (100→75)', game.state.chips === 75);
 rows = sim.deviceState();
-t.ok('딜러 카드 상단 렌더', pixel(rows, 0, 1) && pixel(rows, 8, 1));
-t.ok('플레이어 카드 하단 렌더', pixel(rows, 0, 26) && pixel(rows, 8, 26));
+t.ok('딜러 카드 상단 렌더 (11×16)', pixel(rows, 0, 1) && pixel(rows, 10, 1));
+t.ok('플레이어 카드 하단 렌더 (y=22)', pixel(rows, 0, 22) && pixel(rows, 10, 22));
 t.ok('구분선(점선) 렌더', pixel(rows, 0, 19) && !pixel(rows, 4, 19));
-t.ok('딜러 홀카드 X 패턴', pixel(rows, 12, 3));
+t.ok('딜러 홀카드 X 패턴', pixel(rows, 14, 3));
 t.ok('배분 발화에 카드 이름', /스페이드 9/.test(speeches[speeches.length - 1]));
 
 sim.fireKey('KeyFunction1'); await wait(600);
