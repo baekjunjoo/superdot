@@ -1,6 +1,6 @@
 /* App.jsx — 셀(사이드바+톱바, 레퍼런스 스타일) + 라우팅(로비/방/연습)
    시각장애인(웹+닷패드) + 비장애인(웹) 크로스 플레이
-   v3: 설정(음성 속도·짧은 안내·한국 점자·효과음), 닉네임/ID 영속화(재접속 복구) */
+   설정: 음성/속도/짧은 안내/언어(한국어·English — 닷패드 점자 표기)/효과음, 닉네임·ID 영속화 */
 import React, { useCallback, useState } from 'react';
 import Lobby from './ui/Lobby.jsx';
 import Room from './ui/Room.jsx';
@@ -20,7 +20,7 @@ export default function App() {
   const [tts, setTts] = useState(true);
   const [ttsRate, setTtsRate] = useState(prefs.ttsRate);
   const [quietOthers, setQuietOthers] = useState(prefs.quietOthers);
-  const [brailleKo, setBrailleKo] = useState(prefs.brailleKo);
+  const [lang, setLang] = useState(prefs.lang || (prefs.brailleKo ? 'ko' : 'en'));
   const [sfxOn, setSfxOn] = useState(prefs.sfx);
   const [log, setLog] = useState([]);
 
@@ -104,12 +104,20 @@ export default function App() {
             onClick={() => { const v = !quietOthers; setQuietOthers(v); setPref('quietOthers', v); say('짧은 안내 ' + (v ? '켜. 다른 사람 진행은 생략합니다.' : '끔')); }}>
             짧은 안내 {quietOthers ? 'ON' : 'OFF'}
           </button>
-          <button
-            aria-pressed={brailleKo}
-            title="닷패드 텍스트라인을 한국 점자로 표시"
-            onClick={() => { const v = !brailleKo; setBrailleKo(v); setPref('brailleKo', v); say('텍스트라인 ' + (v ? '한국 점자' : '영어 점자') + '로 표시합니다.'); }}>
-            한국 점자 {brailleKo ? 'ON' : 'OFF'}
-          </button>
+          <label className="setting-row">
+            <span>언어</span>
+            <select
+              value={lang}
+              onChange={(e) => {
+                const v = e.target.value;
+                setLang(v); setPref('lang', v); setPref('brailleKo', v === 'ko');
+                say(v === 'ko' ? '닷패드 점자를 한국어로 표시합니다.' : '닷패드 점자를 영어로 표시합니다.');
+              }}
+              aria-label="언어 설정 (닷패드 점자 표기)">
+              <option value="ko">한국어</option>
+              <option value="en">English</option>
+            </select>
+          </label>
           <button
             aria-pressed={sfxOn}
             onClick={() => { const v = !sfxOn; setSfxOn(v); setPref('sfx', v); say('효과음 ' + (v ? '켜' : '끔')); }}>
