@@ -1,17 +1,14 @@
 /* render.js — 게임 상태 → 촉각 프레임(60×40) + 텍스트라인(20셀)
-   레이아웃: 위 = 딜러, 아래 = 플레이어, 가운데 점선 구분선 (인트로 음성으로 안내)
-   카드 = 11×16 외곽선 + 랭크 글리프(2배 — 획 사이 틈으로 구분 쉬움). 딜러 홀카드 = X 패턴
-   칩 게이지 = 화면 제일 하단(기준선 y34 + 막대 y36~39) */
+   카드 = 11×16 외곽선 + 랭크 글리프(2배). 딜러 홀카드 = X 패턴. 칩 게이지 = 하단. */
 
 import { createFrame, clearBuf, rect, line, dashedHLine, drawGlyph, drawText, textWidth, encodeRows, W } from './frame.js';
 import { strToTextCells } from './braille-core.js';
 import { handValue } from '../game/blackjack.js';
 import { getPrefs } from '../prefs.js';
 
-/* 카드 크게(11×16) — 촉각 가독성 우선 */
 const CARD_W = 11, CARD_H = 16, PITCH = 12;
 const DEALER_Y = 1, PLAYER_Y = 22, DIVIDER_Y = 19;
-const GAUGE_BASE_Y = 34, GAUGE_BAR_Y = 36;      // 칩 게이지: 화면 제일 하단
+const GAUGE_BASE_Y = 34, GAUGE_BAR_Y = 36;
 
 function drawCard(buf, x, y, card, hidden) {
   rect(buf, x, y, CARD_W, CARD_H);
@@ -21,40 +18,34 @@ function drawCard(buf, x, y, card, hidden) {
     return;
   }
   if (card.r === '10') {
-    // 두 자리: 3×5 폰트 세로 2배(3×10) 두 개
     drawGlyph(buf, '1', x + 2, y + 3, 1, 2);
     drawGlyph(buf, '0', x + 6, y + 3, 1, 2);
   } else {
-    // 한 자리: 가로·세로 2배(6×10) — 획 사이 틈이 있어 형태 구분이 쉬움 ('10'과 동일 톤)
     drawGlyph(buf, card.r, x + 2, y + 3, 2, 2);
   }
 }
 
 function drawHand(buf, cards, y, hideHole) {
-  // 최대 5장 표시(초과 시 마지막 5장)
   const shown = cards.slice(-5);
   const offset = cards.length - shown.length;
   shown.forEach((c, i) => {
-    const hidden = hideHole && (offset + i) === 1; // 딜러 2번째 카드 = 홀카드
+    const hidden = hideHole && (offset + i) === 1;
     drawCard(buf, i * PITCH, y, c, hidden);
   });
 }
 
-/* 칩 게이지 — 제일 하단: 기준선(y=34) + 칩 막대(y=36~39, 칩 5개당 1핀) */
 function drawGauge(buf, chips) {
   const g = Math.max(0, Math.min(58, Math.round(chips / 5)));
   rect(buf, 0, GAUGE_BASE_Y, 60, 1, { fill: true });
   if (g > 0) rect(buf, 1, GAUGE_BAR_Y, g, 4, { fill: true });
 }
 
-/* 큰 숫자(4배 = 글자당 12×20) 가운데 정렬 */
 function drawBigLabel(buf, label) {
   const sx = 4, sy = 4;
   const tw = textWidth(label, sx);
   drawText(buf, label, Math.max(0, Math.floor((W - tw) / 2)), 4, sx, sy);
 }
 
-/* 텍스트라인: 20셀 바이트 → hex 40자 (점역, 부족분 0 패딩) */
 export function textLineHex(str) {
   const cells = strToTextCells(str);
   let hex = '';
@@ -91,8 +82,7 @@ export function statusText(st) {
   }
 }
 
-/* ── 멀티플레이: 방 공개 상태 + 내 ID → 내 시점 촉각 프레임 ──
-   내 카드 + 딜러만 표시(다른 플레이어는 음성·화면으로) */
+/* ── 멀티플레이: 방 공개 상태 + 내 ID → 내 시점 촉각 프레임 ── */
 export function roomStatusText(st, myId) {
   const ko = isKo();
   const score = st.opts && st.opts.scoreMode;
@@ -107,6 +97,7 @@ export function roomStatusText(st, myId) {
     case 'betting':
       if (me.sitOut) return ko ? '관전 ' + CH + ' 0' : 'sit out ' + CH + ' 0';
       return ko ? '베팅 ' + me.bet + ' ' + CH + ' ' + me.chips : 'bet ' + me.bet + ' ' + CH + ' ' + me.chips;
+    case 'insurance': return ko ? '보험? 에프1 에프2' : 'insure? f1 f2';
     case 'acting': {
       const mine = st.turnId === myId;
       const hand2 = me.hands && me.hands.length > 1 ? (ko ? ' 핸드' + (me.activeHand + 1) : ' h' + (me.activeHand + 1)) : '';
@@ -133,13 +124,19 @@ export function renderRoom(st, myId) {
     const label = me && !me.sitOut && st.phase === 'betting' ? String(me.bet) : String(st.players.length) ;
     drawBigLabel(buf, label);
     if (me) drawGauge(buf, me.chips);
+  } else if (st.phase === 'insurance') {
+    // 보험 단계: 딜러 카드 + 내 카드 + 하단 결정 대기 신호
+    drawHand(buf, st.dealer, DEALER_Y, false);
+    dashedHLine(buf, DIVIDER_Y);
+    dashedHLine(buf, DIVIDER_Y + 1);
+    drawHand(buf, me.cards, PLAYER_Y, false);
+    rect(buf, 0, 38, 60, 2, { fill: true });
   } else {
-    drawHand(buf, st.dealer, DEALER_Y, false);      // hidden 카드는 카드 객체에 표시됨
+    drawHand(buf, st.dealer, DEALER_Y, false);
     dashedHLine(buf, DIVIDER_Y);
     dashedHLine(buf, DIVIDER_Y + 1);
     drawHand(buf, me.cards, PLAYER_Y, false);
     if (st.phase === 'acting' && st.turnId === myId) {
-      // 내 차례 표시: 화면 맨 아랫줄 가로 실선 (촉각 신호)
       rect(buf, 0, 39, 60, 1, { fill: true });
     }
   }
@@ -151,7 +148,6 @@ export function renderGame(st) {
   clearBuf(buf);
 
   if (st.phase === 'bet' || st.phase === 'over') {
-    // 베팅 화면: 큰 베팅 숫자(4배) + 칩 게이지(제일 하단)
     const label = st.phase === 'over' ? '0' : String(st.bet);
     drawBigLabel(buf, label);
     drawGauge(buf, st.chips);
@@ -161,7 +157,6 @@ export function renderGame(st) {
     dashedHLine(buf, DIVIDER_Y + 1);
     drawHand(buf, st.player, PLAYER_Y, false);
     if (st.pulse) {
-      // 승리 축하 펄스: 화면 테두리 2겹 (카드는 유지)
       rect(buf, 0, 0, 60, 40);
       rect(buf, 1, 1, 58, 38);
     }
