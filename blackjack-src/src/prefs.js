@@ -11,7 +11,8 @@ const DEFAULTS = {
   nick: '',             // 닉네임
   ttsRate: 1.05,        // 발화 속도
   quietOthers: false,   // 짧은 안내: 다른 플레이어 진행 발화 생략(로그에는 남음)
-  brailleKo: false,     // 텍스트라인 한국 점자
+  lang: 'en',           // 언어 설정: 'ko'(한국어) | 'en'(English) — 닷패드 점자 표기 기준
+  brailleKo: false,     // (구버전 호환 필드)
   sfx: true,            // 효과음 (TTS와 분리)
   stats: { games: 0, wins: 0, blackjacks: 0, bestChips: 0 }
 };
