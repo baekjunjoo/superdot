@@ -1,14 +1,17 @@
 /* render.js — 게임 상태 → 촉각 프레임(60×40) + 텍스트라인(20셀)
    레이아웃: 위 = 딜러, 아래 = 플레이어, 가운데 점선 구분선 (인트로 음성으로 안내)
-   카드 = 9×13 외곽선 + 중앙 랭크 글리프. 딜러 홀카드 = X 패턴 */
+   카드 = 11×16 외곽선 + 굵은 랭크 글리프. 딜러 홀카드 = X 패턴
+   칩 게이지 = 화면 제일 하단(기준선 y34 + 막대 y36~39) */
 
 import { createFrame, clearBuf, rect, line, dashedHLine, drawGlyph, drawText, textWidth, encodeRows, W } from './frame.js';
 import { strToTextCells } from './braille-core.js';
 import { handValue } from '../game/blackjack.js';
 import { getPrefs } from '../prefs.js';
 
-const CARD_W = 9, CARD_H = 13, PITCH = 10;
-const DEALER_Y = 1, PLAYER_Y = 26, DIVIDER_Y = 19;
+/* 카드 크게(11×16), 랭크 굵게(가로 3배·세로 2배) — 촉각 가독성 우선 */
+const CARD_W = 11, CARD_H = 16, PITCH = 12;
+const DEALER_Y = 1, PLAYER_Y = 22, DIVIDER_Y = 19;
+const GAUGE_BASE_Y = 34, GAUGE_BAR_Y = 36;      // 칩 게이지: 화면 제일 하단
 
 function drawCard(buf, x, y, card, hidden) {
   rect(buf, x, y, CARD_W, CARD_H);
@@ -19,22 +22,36 @@ function drawCard(buf, x, y, card, hidden) {
   }
   if (card.r === '10') {
     // 두 자리: 3×5 폰트 세로 2배(3×10) 두 개
-    drawGlyph(buf, '1', x + 1, y + 2, 1, 2);
-    drawGlyph(buf, '0', x + 5, y + 2, 1, 2);
+    drawGlyph(buf, '1', x + 2, y + 3, 1, 2);
+    drawGlyph(buf, '0', x + 6, y + 3, 1, 2);
   } else {
-    // 한 자리: 2배 확대(6×10) 중앙
-    drawGlyph(buf, card.r, x + 2, y + 2, 2, 2);
+    // 한 자리: 가로 3배·세로 2배(9×10) — 굵은 획으로 손끝 인식 향상
+    drawGlyph(buf, card.r, x + 1, y + 3, 3, 2);
   }
 }
 
 function drawHand(buf, cards, y, hideHole) {
-  // 최대 6장 표시(초과 시 마지막 6장)
-  const shown = cards.slice(-6);
+  // 최대 5장 표시(초과 시 마지막 5장)
+  const shown = cards.slice(-5);
   const offset = cards.length - shown.length;
   shown.forEach((c, i) => {
     const hidden = hideHole && (offset + i) === 1; // 딜러 2번째 카드 = 홀카드
     drawCard(buf, i * PITCH, y, c, hidden);
   });
+}
+
+/* 칩 게이지 — 제일 하단: 기준선(y=34) + 칩 막대(y=36~39, 칩 5개당 1핀) */
+function drawGauge(buf, chips) {
+  const g = Math.max(0, Math.min(58, Math.round(chips / 5)));
+  rect(buf, 0, GAUGE_BASE_Y, 60, 1, { fill: true });
+  if (g > 0) rect(buf, 1, GAUGE_BAR_Y, g, 4, { fill: true });
+}
+
+/* 큰 숫자(4배 = 글자당 12×20) 가운데 정렬 */
+function drawBigLabel(buf, label) {
+  const sx = 4, sy = 4;
+  const tw = textWidth(label, sx);
+  drawText(buf, label, Math.max(0, Math.floor((W - tw) / 2)), 4, sx, sy);
 }
 
 /* 텍스트라인: 20셀 바이트 → hex 40자 (점역, 부족분 0 패딩) */
@@ -108,23 +125,16 @@ export function renderRoom(st, myId) {
 
   if (!me || st.phase === 'lobby' || st.phase === 'betting') {
     const label = me && !me.sitOut && st.phase === 'betting' ? String(me.bet) : String(st.players.length) ;
-    const sx = 3, sy = 3;
-    const tw = textWidth(label, sx);
-    drawText(buf, label, Math.max(0, Math.floor((W - tw) / 2)), 6, sx, sy);
-    if (me) {
-      const g = Math.max(0, Math.min(58, Math.round(me.chips / 5)));
-      rect(buf, 0, 30, 60, 1, { fill: true });
-      if (g > 0) rect(buf, 1, 32, g, 4, { fill: true });
-    }
+    drawBigLabel(buf, label);
+    if (me) drawGauge(buf, me.chips);
   } else {
     drawHand(buf, st.dealer, DEALER_Y, false);      // hidden 카드는 카드 객체에 표시됨
     dashedHLine(buf, DIVIDER_Y);
     dashedHLine(buf, DIVIDER_Y + 1);
     drawHand(buf, me.cards, PLAYER_Y, false);
     if (st.phase === 'acting' && st.turnId === myId) {
-      // 내 차례 표시: 좌우 가장자리 세로 굵은 띄 (촉각 신호)
-      rect(buf, 0, 22, 2, 16, { fill: true });
-      rect(buf, 58, 22, 2, 16, { fill: true });
+      // 내 차례 표시: 화면 맨 아랫줄 가로 실선 (촉각 신호)
+      rect(buf, 0, 39, 60, 1, { fill: true });
     }
   }
   return { buf, rows: encodeRows(buf), textHex: textLineHex(roomStatusText(st, myId)) };
@@ -135,15 +145,10 @@ export function renderGame(st) {
   clearBuf(buf);
 
   if (st.phase === 'bet' || st.phase === 'over') {
-    // 베팅 화면: 큰 베팅 숫자 + 칩 게이지
+    // 베팅 화면: 큰 베팅 숫자(4배) + 칩 게이지(제일 하단)
     const label = st.phase === 'over' ? '0' : String(st.bet);
-    const sx = 3, sy = 3;
-    const tw = textWidth(label, sx);
-    drawText(buf, label, Math.max(0, Math.floor((W - tw) / 2)), 6, sx, sy);
-    // 칩 게이지: 칩 5개당 1픽셀 (최대 58)
-    const g = Math.max(0, Math.min(58, Math.round(st.chips / 5)));
-    rect(buf, 0, 30, 60, 1, { fill: true });          // 게이지 바닥선
-    if (g > 0) rect(buf, 1, 32, g, 4, { fill: true }); // 게이지
+    drawBigLabel(buf, label);
+    drawGauge(buf, st.chips);
   } else {
     drawHand(buf, st.dealer, DEALER_Y, st.hideHole);
     dashedHLine(buf, DIVIDER_Y);
