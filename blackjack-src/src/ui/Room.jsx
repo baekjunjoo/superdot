@@ -1,7 +1,6 @@
-/* Room.jsx — 멀티플레이 게임룸 v4 (포커 테이블 스타일)
-   중앙 오벌 테이블(딜러 카드) + 좌석 배치(힉스필드 아바타) + 하단 액션 바
-   애니메이션: 카드 딜 스태거/홀카드 플립, 차례 펄스 링, 결과 배지 팝, 이모트 말풍선
-   시각장애인: 닷패드(F1~F4/팬) + 음성 / 비시각장애인: 화면 + 버튼·키보드 (기능 동일) */
+/* Room.jsx — 멀티플레이 게임룸 v5 (포커 테이블 스타일 + 3단 배치)
+   좌: 닷패드 출력 / 중앙: 테이블(힉스필드 폠트) / 우: 안내 로그 — 세로 스크롤 최소화
+   애니메이션: 카드 딜 스태거/홀카드 플립, 차례 펄스 링, 결과 배지 팝, 이모트 말풍선 */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import BLE from '../dotpad/ble.js';
 import { renderRoom, roomStatusText } from '../dotpad/render.js';
@@ -325,9 +324,27 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
 
       {hostSettings()}
 
+      {/* ── 3단 배치: 닷패드(좌) · 테이블(중앙) · 로그(우) ── */}
+      <div className="room-grid">
+        <aside className="rg-left" aria-label="닷패드 출력">
+          <div className="dotpad-panel dotpad-vert">
+            <canvas ref={canvasRef} width={W * 6} height={H * 6} aria-label="닷패드 미리보기 (내 카드와 딜러)" />
+            <div className="textline">
+              <span className="braille" aria-hidden="true">{toUnicodeBraille(roomStatusText(st, me.id))}</span>
+              <span className="plain">{roomStatusText(st, me.id)}</span>
+            </div>
+          </div>
+          <p className="hint">
+            키보드: 1~4 = F1~F4, ←/→ = 팬, 5~0 = 이모트 · 닷패드: F1~F4 물리키 + 팬 좌/우 (스플릿 = 팬 오른쪽)
+            <br />스크린리더(NVDA 등): 숫자키는 <strong>포커스 모드</strong>에서 동작. 브라우즈 모드에선 화면 버튼 이용.
+          </p>
+        </aside>
+
+        <div className="rg-center">
       {/* ── 포커 테이블 스테이지 ── */}
       <div className="pk-stage" aria-label="게임 테이블">
         <div className="pk-table">
+          <img className="pk-felt" src={IMG.tablefelt.local} alt="" onError={imgFallback('tablefelt')} aria-hidden="true" />
           <div className="pk-rail" aria-hidden="true" />
           <div className="pk-dealer-zone" aria-label={'딜러 카드, 합계 ' + dealerTotal}>
             <div className="pk-dealer-head">
@@ -392,23 +409,14 @@ export default function Room({ client, me, isHost, code, mode, say, log, onLeave
           <button key={i} onClick={() => { sfx.emote(); client.sendAction('emote', i); }}>{t}</button>
         ))}
       </section>
-
-      <div className="dotpad-panel">
-        <canvas ref={canvasRef} width={W * 6} height={H * 6} aria-label="닷패드 미리보기 (내 카드와 딜러)" />
-        <div className="textline">
-          <span className="braille" aria-hidden="true">{toUnicodeBraille(roomStatusText(st, me.id))}</span>
-          <span className="plain">{roomStatusText(st, me.id)}</span>
         </div>
+
+        <aside className="rg-right" aria-label="안내 로그">
+          <section className="log log-scroll rg-log" aria-live="polite" ref={logRef}>
+            {log.map((l, i) => <div key={i}>{l}</div>)}
+          </section>
+        </aside>
       </div>
-
-      <p className="hint">
-        키보드: 1~4 = F1~F4, ←/→ = 팬, 5~0 = 이모트 · 닷패드: F1~F4 물리키 + 팬 좌/우 (스플릿 = 팬 오른쪽)
-        <br />스크린리더(NVDA 등) 사용 시: 숫자키는 <strong>포커스 모드</strong>에서 동작합니다. 브라우즈 모드에서는 화면 버튼을 이용하세요.
-      </p>
-
-      <section aria-label="안내 로그" className="log log-scroll" aria-live="polite" ref={logRef}>
-        {log.map((l, i) => <div key={i}>{l}</div>)}
-      </section>
     </div>
   );
 }
