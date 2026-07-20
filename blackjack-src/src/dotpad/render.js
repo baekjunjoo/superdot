@@ -66,8 +66,14 @@ export function textLineHex(str) {
   return hex;
 }
 
+/* 언어 설정: lang('ko'|'en') 우선, 구버전 brailleKo 폴백 */
+function isKo() {
+  const p = getPrefs();
+  return p.lang ? p.lang === 'ko' : !!p.brailleKo;
+}
+
 export function statusText(st) {
-  const ko = getPrefs().brailleKo;
+  const ko = isKo();
   const pv = st.player.length ? handValue(st.player).total : 0;
   const dUp = st.dealer.length ? handValue(st.hideHole ? [st.dealer[0]] : st.dealer).total : 0;
   switch (st.phase) {
@@ -88,7 +94,7 @@ export function statusText(st) {
 /* ── 멀티플레이: 방 공개 상태 + 내 ID → 내 시점 촉각 프레임 ──
    내 카드 + 딜러만 표시(다른 플레이어는 음성·화면으로) */
 export function roomStatusText(st, myId) {
-  const ko = getPrefs().brailleKo;
+  const ko = isKo();
   const score = st.opts && st.opts.scoreMode;
   const CH = score ? (ko ? '점수' : 'pts') : (ko ? '칩' : 'chips');
   const me = st.players.find((p) => p.id === myId);
