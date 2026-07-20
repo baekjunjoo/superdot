@@ -9,10 +9,14 @@ import { createTable } from '../game/table.js';
 import { RECONNECT_GRACE_MS } from '../config.js';
 
 export function createRoomClient({ transport, me, isHost, say = () => {}, engineOpts = {}, graceMs = RECONNECT_GRACE_MS }) {
+  // engineOpts: 호스트가 저장해둔 방 기본 설정(turnTimeout/dealerDelay/scoreMode)을 시드로 사용
   let engine = null;
   let lastState = undefined;   // undefined=수신 전, null=방 종료
   let hostSeen = isHost;
   let closed = false;
+  let hostLossTimer = null;           // 호스트 상실 감지 디바운스(승계 전파 대기)
+  let lastHasHost = isHost;           // 최근 presence에 호스트 존재 여부
+  const HOST_LOSS_GRACE_MS = 5000;    // 이 시간 내 새 호스트가 안 나타나면 방 종료
   const pendingRemoval = new Map();   // id → {timer, nick} 재접속 유예
 
   function handleState(st) { lastState = st; if (client.onStateChange) client.onStateChange(st); }
@@ -76,7 +80,7 @@ export function createRoomClient({ transport, me, isHost, say = () => {}, engine
 
   transport.onPresence((list) => {
     const ids = new Set(list.map((m) => m.id));
-    if (engine) {
+    if (isHost && engine) {
       // 복귀자 유예 해제
       [...pendingRemoval.keys()].forEach((id) => {
         if (ids.has(id)) {
@@ -97,10 +101,22 @@ export function createRoomClient({ transport, me, isHost, say = () => {}, engine
           pendingRemoval.set(p.id, { timer, nick: p.nick });
         }
       });
-    } else if (!isHost && !engine && hostSeen && !list.some((m) => m.host)) {
-      if (!closed) { closed = true; say('호스트 연결이 끊겼습니다. 방이 종료됩니다.'); handleState(null); }
+    } else if (!isHost && !engine) {
+      const hasHost = list.some((m) => m.host);
+      lastHasHost = hasHost;
+      if (hasHost) {
+        hostSeen = true;
+        if (hostLossTimer) { clearTimeout(hostLossTimer); hostLossTimer = null; }
+      } else if (hostSeen && !closed && !hostLossTimer) {
+        // 호스트가 사라짐 — 승계(handover)가 전파될 시간을 준 뒤 재확인해 오탐 종료 방지
+        hostLossTimer = setTimeout(() => {
+          hostLossTimer = null;
+          if (!engine && !closed && !lastHasHost) {
+            closed = true; say('호스트 연결이 끊겼습니다. 방이 종료됩니다.'); handleState(null);
+          }
+        }, HOST_LOSS_GRACE_MS);
+      }
     }
-    if (!isHost && list.some((m) => m.host)) hostSeen = true;
   });
 
   async function join() {
@@ -123,9 +139,13 @@ export function createRoomClient({ transport, me, isHost, say = () => {}, engine
         // 호스트 승계: 나 다음으로 오래된 참가자에게 이양 (없으면 방 종료)
         const others = engine.state.players.filter((p) => p.id !== me.id);
         if (others.length) {
+          // 미정산 진행 중인 판(보험/액션/딜러)에서만 베팅·보험을 칩으로 반환 (안내 문구와 일치).
+          // result 국면은 이미 정산되어 chips에 반영됐으므로 반환하지 않음.
+          const inPlay = ['insurance', 'acting', 'dealer'].includes(engine.state.phase);
+          const refund = (p) => inPlay ? (p.handBets || []).reduce((a, b) => a + b, 0) + (p.insBet || 0) : 0;
           transport.send('handover', {
             toId: others[0].id,
-            players: others.map((p) => ({ id: p.id, nick: p.nick, chips: p.chips })),
+            players: others.map((p) => ({ id: p.id, nick: p.nick, chips: p.chips + refund(p) })),
             round: engine.state.round,
             opts: engine.state.opts
           });
@@ -136,6 +156,7 @@ export function createRoomClient({ transport, me, isHost, say = () => {}, engine
       } else {
         transport.send('bye', { id: me.id });   // 게스트 정상 퇴장
       }
+      if (hostLossTimer) { clearTimeout(hostLossTimer); hostLossTimer = null; }
       transport.leave();
     }
   };

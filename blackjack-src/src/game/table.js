@@ -1,18 +1,21 @@
-/* table.js — 다인 블랙잭 테이블 엔진 (호스트 권위)
-   스플릿·턴타이머·관전·이모트·점수모드·라운드요약·방설정 + 인슈어런스(딜러 오픈 A)
-   announce(text, to, kind): to=null(전원)|id|{except:id}, kind='others'|'emote' */
+/* table.js — 다인 블랙잭 테이블 엔진 v3 (호스트 권위)
+   v3 추가: 스플릿(핸드 배열) · 턴 타이머(자동 스탠드) · 관전 모드(좌석 초과/중계) ·
+   이모트(쿨다운) · 점수 모드(용어 치환) · 라운드 요약 · 방 설정(set 액션)
+   announce(text, to, kind):
+     to = null(전원+관전) | id(해당자만) | {except:id}(해당자 제외 전원)
+     kind = 'others'(다른 사람 진행 — 짧은 안내 모드에서 생략 가능) | 'emote' | 기본 undefined */
 
 import * as BJ from './blackjack.js';
 import { MAX_SEATS, START_CHIPS } from '../config.js';
 
 const BET_OPTIONS = [10, 25, 50, 100];
-export const EMOTES = ['나이스!', '굿 게임!', '아깝다!', '조심하세요~', '서둘러 주세요!', 'ㅋㅋㅋ'];
+export const EMOTES = ['나이스!', '굿 게임!', '아까다!', '조심하세요~', '서둘러 주세요!', 'ㅋㅋㅋ'];
 
 export function createTable({ announce = () => {}, onState = () => {}, rng = Math.random, deckFactory = null, dealerDelay = 900, turnTimeout = 30000, scoreMode = false } = {}) {
   const T = {
     phase: 'lobby',          // lobby | betting | insurance | acting | dealer | result
-    players: [],
-    spectators: [],
+    players: [],             // {id,nick,chips,bet,betConfirmed,hands,handBets,activeHand,handDone,done,results,ready,sitOut,_emoteAt,insBet,insDecided,insWon}
+    spectators: [],          // {id,nick} — 좌석 초과 입장자 (다음 빈자리에 자동 승격)
     dealer: [], deck: [],
     hideHole: true,
     turnId: null,
@@ -21,6 +24,7 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
   };
   let turnTimer = null, warnTimer = null;
 
+  /* 점수 모드: 발화·표기에서 도박 용어 치환 (수업용) */
   function term(text) {
     return T.opts.scoreMode ? text.replace(/베팅/g, '점수').replace(/칩/g, '점수') : text;
   }
@@ -56,6 +60,12 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
   function handKo(cards) { return cards.map(BJ.cardNameKo).join(', '); }
   function vKo(cards) { const v = BJ.handValue(cards); return v.total + (v.soft ? ' 소프트' : ''); }
 
+  /* 카드 한 장 뽑기 — 덱 소진 시 새 덱으로 리셔플(단일 덱 재사용)해 크래시 방지 */
+  function draw() {
+    if (!T.deck.length) T.deck = BJ.newDeck(rng);
+    return T.deck.pop();
+  }
+
   function freshHand(p) {
     p.insBet = 0; p.insDecided = false; p.insWon = false;
     p.hands = []; p.handBets = []; p.handDone = []; p.activeHand = 0;
@@ -74,7 +84,10 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
       return true;
     }
     const sitOut = T.phase !== 'lobby' && T.phase !== 'betting';
-    const p = { id, nick, chips: START_CHIPS, bet: 25, betConfirmed: false, sitOut, _emoteAt: 0 };
+    const p = {
+      id, nick, chips: START_CHIPS, bet: 25, betConfirmed: false,
+      sitOut, _emoteAt: 0
+    };
     freshHand(p);
     T.players.push(p);
     A(nick + ' 님이 입장했습니다.' + (sitOut ? ' 다음 판부터 참가합니다.' : ''));
@@ -123,7 +136,7 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
       if (!p.sitOut && p.bet > p.chips) p.bet = betOptions(p)[0];
       if (p.sitOut) A('칩이 없어 이번 판은 관전합니다.', p.id);
     });
-    A(T.round + '라운드. 베팅을 정하고 확정해 주세요. 팬 키로 조절, 에프1 확정.');
+    A(T.round + '라운드. 베팅을 정하고 확정해 주세요. 팬 키로 조절, 에프원 확정.');
     emit();
   }
 
@@ -151,11 +164,11 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
     const bettors = T.players.filter((p) => !p.sitOut);
     bettors.forEach((p) => {
       p.chips -= p.bet;
-      p.handBets = [p.bet]; p.hands = [[T.deck.pop()]]; p.handDone = [false]; p.activeHand = 0;
+      p.handBets = [p.bet]; p.hands = [[draw()]]; p.handDone = [false]; p.activeHand = 0;
     });
-    T.dealer = [T.deck.pop()];
-    bettors.forEach((p) => { p.hands[0].push(T.deck.pop()); });
-    T.dealer.push(T.deck.pop());
+    T.dealer = [draw()];
+    bettors.forEach((p) => { p.hands[0].push(draw()); });
+    T.dealer.push(draw());
     T.hideHole = true;
 
     A('카드 배분. 딜러 오픈 카드 ' + BJ.cardNameKo(T.dealer[0]) + '.');
@@ -163,6 +176,7 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
       A('당신 카드 ' + handKo(p.hands[0]) + ', 합계 ' + vKo(p.hands[0]) + '.', p.id);
       if (BJ.isBlackjack(p.hands[0])) { p.handDone[0] = true; p.done = true; A('블랙잭!', p.id); A(p.nick + ' 님 블랙잭!', { except: p.id }, 'others'); }
     });
+    // 인슈어런스: 딜러 오픈이 에이스면 보험 단계 (베팅의 절반, 딜러 블랙잭 시 2대1)
     if (T.dealer[0].r === 'A') { startInsurance(bettors); return; }
     T.turnId = null;
     advanceTurn();
@@ -174,21 +188,25 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
     T.phase = 'insurance';
     T.turnId = null;
     bettors.forEach((p) => {
-      p.insDecided = p.chips < Math.ceil(p.bet / 2);
+      p.insDecided = p.chips < Math.ceil(p.bet / 2); // 칩 부족하면 자동 패스 처리
       if (p.insDecided) A('보험을 걸 칩이 부족해 자동 패스합니다.', p.id);
     });
-    A('딜러 오픈 카드가 에이스입니다. 보험을 거시겠어요? 에프1 보험(베팅의 절반), 에프2 패스.');
+    A('딜러 오픈 카드가 에이스입니다. 보험을 거시겠어요? 에프원 보험(베팅의 절반), 에프투 패스.');
     if (allInsDecided()) return resolveInsurance();
     emit();
   }
-  function allInsDecided() { return active().every((p) => p.insDecided); }
+  function allInsDecided() {
+    return active().every((p) => p.insDecided);
+  }
   function resolveInsurance() {
     const dealerBJ = BJ.isBlackjack(T.dealer);
     if (dealerBJ) {
       T.hideHole = false;
-      active().forEach((p) => { if (p.insBet > 0) { p.chips += p.insBet * 3; p.insWon = true; } });
+      active().forEach((p) => {
+        if (p.insBet > 0) { p.chips += p.insBet * 3; p.insWon = true; }  // 낸 보험 + 2:1 이득 = 3배 반환
+      });
       A('딜러 블랙잭! 보험을 건 분은 보험금 지급, 원 베팅은 정산됩니다.');
-      settleAll();
+      settleAll();       // 딜러 블랙잭 상대로 원 핸드 정산 (플레이어 BJ면 푸시)
       return;
     }
     A('딜러는 블랙잭이 아닙니다. 보험은 무효, 게임을 계속합니다.');
@@ -198,6 +216,7 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
     emit();
   }
 
+  /* 플레이어의 다음 미완료 핸드로 이동. 없으면 done */
   function nextHand(p) {
     const idx = p.handDone.findIndex((d) => !d);
     if (idx === -1) { p.done = true; return false; }
@@ -233,7 +252,7 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
     const order = active();
     const cur = T.turnId ? find(T.turnId) : null;
     let turn = null;
-    if (cur && !cur.done && order.includes(cur)) turn = cur;
+    if (cur && !cur.done && order.includes(cur)) turn = cur;              // 같은 플레이어의 남은 핸드
     else {
       const start = cur ? order.indexOf(cur) + 1 : 0;
       turn = order.slice(start).find((p) => !p.done) || null;
@@ -242,7 +261,7 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
       T.turnId = turn.id;
       nextHand(turn);
       if (turn.done) return advanceTurn();
-      A('당신 차례입니다. 에프1 히트, 에프2 스탠드' + (canDouble(turn) ? ', 에프3 더블다운' : '') + (canSplit(turn) ? ', 팬 오른쪽 스플릿' : '') + '.', turn.id);
+      A('당신 차례입니다. 에프원 히트, 에프투 스탠드' + (canDouble(turn) ? ', 에프쓰 더블다운' : '') + (canSplit(turn) ? ', 팬 오른쪽 스플릿' : '') + '.', turn.id);
       A(turn.nick + ' 님 차례.', { except: turn.id }, 'others');
       armTurnTimer(turn);
       emit();
@@ -262,7 +281,7 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
 
   function doHit(p, isDouble) {
     const i = p.activeHand;
-    const c = T.deck.pop();
+    const c = draw();
     p.hands[i].push(c);
     const v = BJ.handValue(p.hands[i]);
     A('카드 ' + BJ.cardNameKo(c) + ', 합계 ' + vKo(p.hands[i]) + (v.total > 21 ? '. 버스트!' : '.'), p.id);
@@ -286,16 +305,24 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
 
   function doSplit(p) {
     const [c1, c2] = p.hands[0];
+    const splitAces = c1.r === 'A';   // 스플릿은 같은 랭크에서만 가능하므로 c1로 판정
     p.chips -= p.handBets[0];
     p.hands = [[c1], [c2]];
     p.handBets = [p.handBets[0], p.handBets[0]];
     p.handDone = [false, false];
     p.activeHand = 0;
-    p.hands[0].push(T.deck.pop());
-    p.hands[1].push(T.deck.pop());
+    p.hands[0].push(draw());
+    p.hands[1].push(draw());
     A('스플릿. 첫 핸드 ' + handKo(p.hands[0]) + ', 합계 ' + vKo(p.hands[0]) + '.', p.id);
     A(p.nick + ' 님 스플릿.', { except: p.id }, 'others');
-    if (BJ.handValue(p.hands[0]).total >= 21) { p.handDone[0] = true; if (!nextHand(p)) return advanceTurn(); }
+    if (splitAces) {
+      // 표준 규칙: 스플릿한 에이스는 각 핸드에 한 장씩만 받고 종료
+      p.handDone = [true, true];
+      A('스플릿한 에이스는 각각 한 장씩만 받고 종료됩니다.', p.id);
+      if (!nextHand(p)) return advanceTurn();
+    }
+    // 스플릿 직후 21이면 해당 핸드 자동 완료
+    if (!p.handDone[0] && BJ.handValue(p.hands[0]).total >= 21) { p.handDone[0] = true; if (!nextHand(p)) return advanceTurn(); }
     armTurnTimer(p);
     emit();
   }
@@ -308,7 +335,7 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
     emit();
     const step = () => {
       if (BJ.dealerShouldHit(T.dealer)) {
-        const c = T.deck.pop();
+        const c = draw();
         T.dealer.push(c);
         const v = BJ.handValue(T.dealer);
         A('딜러 ' + BJ.cardNameKo(c) + ', 합계 ' + v.total + (v.total > 21 ? '. 딜러 버스트!' : '.'));
@@ -325,13 +352,14 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
     T.phase = 'result';
     const lines = [];
     active().forEach((p) => {
-      p.results = p.hands.map((h, i) => BJ.settle({ bet: p.handBets[i], player: h, dealer: T.dealer }));
+      p.results = p.hands.map((h, i) => BJ.settle({ bet: p.handBets[i], player: h, dealer: T.dealer, playerNatural: p.hands.length === 1 }));
       const total = p.results.reduce((a, r) => a + r.payout, 0);
       p.chips += total;
       const words = p.results.map((r) => RESULT_KO[r.outcome]).join(', ');
-      A(words + (total > 0 ? '. ' + total + ' 칩 획득' : '') + '. 보유 칩 ' + p.chips + '. 에프1 준비.', p.id);
+      A(words + (total > 0 ? '. ' + total + ' 칩 획득' : '') + '. 보유 칩 ' + p.chips + '. 에프원 준비.', p.id);
       lines.push(p.nick + ' ' + words);
     });
+    // 라운드 요약 — 관전자 중계 + 수업 정리용 (짧은 안내 모드에서는 생략 가능)
     if (lines.length) A('라운드 결과 요약. ' + lines.join('. ') + '.', undefined, 'others');
     const standing = T.players.filter((p) => p.chips > 0).length;
     if (!standing) A('모든 플레이어의 칩이 소진되었습니다. 호스트가 새 게임을 시작할 수 있습니다.');
@@ -347,23 +375,26 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
     const p = find(id);
     if (!p) {
       const s = findSpec(id);
-      if (s) A('관전 중입니다. ' + T.players.length + '명 플레이 중, ' + (T.phase === 'acting' && T.turnId ? find(T.turnId).nick + ' 님 차례.' : ''), id);
+      if (s) {
+        A('관전 중입니다. ' + T.players.length + '명 플레이 중, ' + (T.phase === 'acting' && T.turnId ? (find(T.turnId)?.nick || '') + ' 님 차례.' : ''), id);
+      }
       return;
     }
     const dv = T.dealer.length ? BJ.cardNameKo(T.dealer[0]) : '없음';
     const h = p.hands[p.activeHand] || [];
-    if (T.phase === 'betting') A('베팅 ' + p.bet + ', 보유 칩 ' + p.chips + '. ' + (p.betConfirmed ? '확정됨, 대기 중.' : '에프1 확정.'), id);
-    else if (T.phase === 'insurance') A('딜러 오픈 에이스. 당신 카드 ' + handKo(h) + '. ' + (p.insDecided ? (p.insBet > 0 ? '보험 ' + p.insBet + ' 걸었습니다.' : '패스했습니다.') + ' 대기 중.' : '에프1 보험, 에프2 패스.'), id);
+    if (T.phase === 'betting') A('베팅 ' + p.bet + ', 보유 칩 ' + p.chips + '. ' + (p.betConfirmed ? '확정됨, 대기 중.' : '에프원 확정.'), id);
+    else if (T.phase === 'insurance') A('딜러 오픈 에이스. 당신 카드 ' + handKo(h) + '. ' + (p.insDecided ? (p.insBet > 0 ? '보험 ' + p.insBet + ' 걸었습니다.' : '패스했습니다.') + ' 대기 중.' : '에프원 보험, 에프투 패스.'), id);
     else if (T.phase === 'acting' || T.phase === 'dealer') A('당신 카드 ' + handKo(h) + ', 합계 ' + vKo(h) + '. 딜러 오픈 카드 ' + dv + '. ' + (T.turnId === id ? '당신 차례.' : '대기 중.'), id);
-    else if (T.phase === 'result') A((p.results.length ? '결과 ' + p.results.map((r) => RESULT_KO[r.outcome]).join(', ') + '. ' : '') + '보유 칩 ' + p.chips + '. 에프1 준비.', id);
+    else if (T.phase === 'result') A((p.results.length ? '결과 ' + p.results.map((r) => RESULT_KO[r.outcome]).join(', ') + '. ' : '') + '보유 칩 ' + p.chips + '. 에프원 준비.', id);
     else A('대기실입니다. 호스트가 게임을 시작하면 베팅이 열립니다.', id);
   }
 
   /* ── 액션 진입점 ── */
   function action(id, act, val) {
+    /* 전 국면 공통 */
     if (act === 'status') return statusFor(id);
     if (act === 'rules') {
-      A('블랙잭 규칙. 21에 가까우면 승리, 넘으면 버스트. 에이스는 1 또는 11. 딜러는 16 이하 히트, 17 스탠드. 블랙잭은 1.5배. 같은 숫자 두 장은 스플릿. 딜러가 에이스면 보험.', id);
+      A('블랙잭 규칙. 21에 가까우면 승리, 넘으면 버스트. 에이스는 1 또는 11. 딜러는 16 이하 히트, 17 스탠드. 블랙잭은 1.5배. 같은 숫자 두 장은 스플릿 가능.', id);
       return;
     }
     if (act === 'emote') {
@@ -413,7 +444,7 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
         emit();
         return checkAllConfirmed();
       }
-      A('팬 키로 베팅 조절, 에프1 확정, 에프2 규칙 설명.', id);
+      A('팬 키로 베팅 조절, 에프원 확정, 에프투 규칙 설명.', id);
     } else if (T.phase === 'insurance') {
       if (p.sitOut || !p.handBets.length) { A('이번 판은 관전입니다.', id); return; }
       if (p.insDecided) { A('이미 결정했습니다. 다른 플레이어 대기 중.', id); return; }
@@ -433,7 +464,7 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
         if (allInsDecided()) resolveInsurance();
         return;
       }
-      A('에프1 보험(베팅의 절반), 에프2 패스.', id);
+      A('에프원 보험(베팅의 절반), 에프투 패스.', id);
     } else if (T.phase === 'acting') {
       if (T.turnId !== id) { A('아직 당신 차례가 아닙니다. 잠시만요.', id); return; }
       if (act === 'hit') { clearTurnTimer(); return doHit(p, false); }
@@ -451,7 +482,7 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
         clearTurnTimer();
         return doSplit(p);
       }
-      A('에프1 히트, 에프2 스탠드' + (canDouble(p) ? ', 에프3 더블다운' : '') + (canSplit(p) ? ', 팬 오른쪽 스플릿' : '') + '.', id);
+      A('에프원 히트, 에프투 스탠드' + (canDouble(p) ? ', 에프쓰 더블다운' : '') + (canSplit(p) ? ', 팬 오른쪽 스플릿' : '') + '.', id);
     } else if (T.phase === 'dealer') {
       A('잠시만요. 딜러가 카드를 뽑는 중입니다.', id);
     } else if (T.phase === 'result') {
@@ -469,10 +500,11 @@ export function createTable({ announce = () => {}, onState = () => {}, rng = Mat
         A('새 게임. 모두 칩 ' + START_CHIPS + '개로 시작합니다.');
         return startBetting();
       }
-      A('에프1을 누르면 다음 판 준비 완료.', id);
+      A('에프원을 누르면 다음 판 준비 완료.', id);
     }
   }
 
+  /* 호스트 승계용: 공개 정보로 새 엔진에 이어받기 */
   function seed({ players = [], round = 0, opts = {} }) {
     T.round = round;
     T.opts = { ...T.opts, ...opts };
