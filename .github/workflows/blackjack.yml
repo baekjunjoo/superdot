@@ -1,0 +1,56 @@
+name: Build blackjack game
+
+on:
+  push:
+    branches: [main]
+    paths: ['blackjack-src/**', '.github/workflows/blackjack.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: blackjack-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        working-directory: blackjack-src
+        run: npm install --no-audit --no-fund
+
+      - name: Copy DotPad SDK (repo root)
+        run: |
+          mkdir -p blackjack-src/public
+          cp DotPadSDK-3.0.0.js blackjack-src/public/
+
+      - name: Fetch Higgsfield images (self-host)
+        working-directory: blackjack-src
+        run: node scripts/fetch-assets.mjs || echo "image fetch failed - CDN fallback will be used"
+
+      - name: Test (109 checks)
+        working-directory: blackjack-src
+        run: npm test
+
+      - name: Build
+        working-directory: blackjack-src
+        run: npx vite build
+
+      - name: Publish to /blackjack (GitHub Pages serves main root)
+        run: |
+          rm -rf blackjack
+          mv blackjack-src/dist blackjack
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add blackjack
+          git commit -m "build: blackjack game [skip ci]" || echo "no changes"
+          git pull --rebase origin main || true
+          git push
