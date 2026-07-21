@@ -11,7 +11,7 @@ const TUTORIAL = [
   '내 차례에는 에프원1이 히트(카드 한 장 더 받기), 에프투가 스탠드(지금 카드로 멈추기)예요.',
   '닷패드는 물리 F1~F4와 팬 키로, 화면은 같은 이름의 버튼으로 조작합니다. 키보드는 숫자 1~4가 F1~F4.',
   '언제든 F4를 누르면 지금 상황을 다시 들려주고, F2로 규칙을 들을 수 있어요.',
-  '시작하려면 방 만들기를 누르거나 초대 코드로 입장하세요. 혼자 익히려면 연습 모드, 간단한 게임은 하이·로우를 골라보세요.'
+  '시작하려면 방 만들기를 누르거나 초대 코드로 입장하세요. 혼자 익힐려면 연습 모드, 간단한 게임은 하이·로우를 골라보세요.'
 ];
 const TUT_INTRO = '촉각 블랙잭 게임 방법입니다. ';
 
@@ -80,7 +80,7 @@ export default function Lobby({ nick, setNick, onCreate, onJoin, onSolo, onHighL
       {showTut && (
         <section className="tutorial" aria-label="게임 방법" role="region">
           <div className="tutorial-head">
-            <h3 className="section-title"><span className="accent">●</span> 게임 방법</h3>
+            <h3 className="section-title"><span className="accent" aria-hidden="true">♠</span> 게임 방법</h3>
             <div className="tutorial-actions">
               <button onClick={() => say(TUT_INTRO + TUTORIAL.join(' '))}>다시 듣기</button>
               <button onClick={() => setShowTut(false)}>닫기</button>
@@ -93,7 +93,7 @@ export default function Lobby({ nick, setNick, onCreate, onJoin, onSolo, onHighL
       )}
 
       <section className="my-stats" aria-label="내 기록">
-        <h3 className="section-title"><span className="accent">●</span> 내 기록</h3>
+        <h3 className="section-title"><span className="accent" aria-hidden="true">♠</span> 내 기록</h3>
         <div className="stats-row">
           <span className="stats-today">오늘 <strong>{stats.todayGames}</strong>판 · 승률 <strong>{todayRate}%</strong></span>
           <span>누적 <strong>{stats.games}</strong>판</span>
@@ -103,7 +103,7 @@ export default function Lobby({ nick, setNick, onCreate, onJoin, onSolo, onHighL
         </div>
       </section>
 
-      <h3 className="section-title"><span className="accent">●</span> 게임</h3>
+      <h3 className="section-title"><span className="accent" aria-hidden="true">♠</span> 게임</h3>
       <div className="tiles">
         <button className="tile" onClick={() => onCreate(mode)}>
           <div className="tile-head"><strong>BJ</strong><span>멀티 블랙잭</span></div>
